@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+
+    <link rel="stylesheet" href="../src/leaflet-soton.css" />
+    <link rel="stylesheet" href="../resources/leaflet/dist/leaflet.css" />
+
+<style type="text/css">
+
+html { height: 100% }
+body { height: 100%; margin: 0px; padding: 0px }
+#top_bar {
+  height: 10%;
+  width:100%;
+  height:5%;
+  border-bottom: 1px solid #000;
+  overflow:hidden;
+  background-color:#ccc
+}
+
+#map_canvas { height: 90% }
+
+.info_photo {
+    float:right;
+    padding: 0em 0em 0.3em 1em;
+}
+.info {
+    font-family: sans-serif;
+    width: 400px;
+    height: 200px;
+    overflow-y: auto;
+}
+.info_label {
+    font-weight: bold;
+    font-size: 130%;
+}
+.info_n {
+    font-size: 200%;
+}
+.info_link {
+    margin-bottom: 1em;
+    font-size: small;
+}
+.info_txt {
+    margin-bottom: 0.5em;
+}
+#resultsDiv {
+    padding-bottom: 2em;
+}
+#resultsDiv a {
+    display: block;
+    padding-top: 0.3em;
+    padding-left: 5%;
+    padding-right: 5%;
+}
+#resultsDiv a .n {
+    padding-right: 0.5em;
+    display: block;
+    float: right;
+    font-size: 90%;
+}
+#resultsDiv a .label {
+    display: block;
+    padding-left: 0.5em;
+    border-bottom: solid 1px #ccc;
+    padding-bottom: 0.3em;
+    font-size: 120%;
+}
+
+#searchBox {
+    text-align: center;
+    width: 90%;
+    font-size: 140%;
+    padding: 0.1em;
+    border: solid 1px #000;
+}
+
+</style>
+
+</head>
+<body>
+<div id="top_bar">
+<div style='font-size:40px;padding:5px 5px 3px 5px;'>
+    Building Search
+</div>
+</div>
+<div id="map" style="width:70%; height:95%; float:right"></div>
+
+<div style='height:95%;overflow-y:auto;border-right:1px solid #000'>
+
+    <div style='padding-bottom:0.5em;border-bottom:solid 1px #000;margin-bottom:0.5em'>
+
+        <div style='margin:0.3em;text-align:center;clear:both;'>
+            <input id='searchBox' />
+        </div>
+        <div style='text-align:center'>
+            <label>
+                <input id='res' type='checkbox' name='res' value='yes' />
+                Include Halls and Residential Buildings
+            </label>
+        </div>
+        <div style='text-align:center;margin-top:0.3em;font-size:80%'>
+            Type "b12." to search for a specific building number.
+        </div>
+    </div>
+
+    <div id='resultsDiv'>
+    </div>
+</div>
+
+<script src="../resources/leaflet/dist/leaflet.js"></script>
+<script src="../src/leaflet-soton.js"></script>
+<script type="text/javascript">
+    LS.imagePath = '../resources/images/';
+    LS.dataPath = '../data.json';
+
+    var map = LS.map('map');
+
+    LS.on("dataload", function(data) {
+        var searchBox = document.getElementById("searchBox");
+        var residentialTickBox = document.getElementById("res");
+        var resultsDiv = document.getElementById("resultsDiv");
+
+        var buildings = data.buildings.features.sort(function(a, b) {
+            return a.properties.name.localeCompare(b.properties.name);
+        });
+
+        function filter() {
+            var searchText = searchBox.value.toLowerCase();
+
+            resultsDiv.innerHTML = "";
+
+            var results = [];
+
+            buildings.forEach(function(building) {
+                var name = building.properties.name;
+
+                if (name.length === 0)
+                    return;
+
+                if (name.toLowerCase().indexOf(searchText) !== -1) {
+                    var a = document.createElement("a");
+                    a.href = "#";
+
+                    a.onclick = function() {
+                        map.showPopupByURI(building.properties.uri);
+                    };
+
+                    var label = document.createElement("span");
+                    label.textContent = name;
+                    label.className = "label";
+                    a.appendChild(label);
+
+                    var n = document.createElement("span");
+                    n.textContent = building.properties.loc_ref;
+                    n.className = "n";
+                    a.appendChild(n);
+
+                    resultsDiv.appendChild(a);
+
+                    results.push(building.properties.uri);
+                }
+            });
+
+            if (results.length === 1) {
+                map.showPopupByURI(results[0]);
+            }
+        }
+
+        searchBox.onkeyup = filter;
+
+        filter();
+    });
+</script>
+</body>
+</html>

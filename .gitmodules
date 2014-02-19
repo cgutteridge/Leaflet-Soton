@@ -1,0 +1,18 @@
+[submodule "resources/leaflet"]
+	path = resources/leaflet
+	url = https://github.com/Leaflet/Leaflet.git
+[submodule "resources/syntaxhighlighter"]
+	path = resources/syntaxhighlighter
+	url = https://github.com/alexgorbatchev/syntaxhighlighter.git
+[submodule "resources/leaflet-markercluster"]
+	path = resources/leaflet-markercluster
+	url = https://github.com/Leaflet/Leaflet.markercluster.git
+[submodule "resources/mfd-location"]
+	path = resources/mfd-location
+	url = git@sourcekettle.ecs.soton.ac.uk:projects/mfd-location.git
+[submodule "resources/leaflet-locatecontrol"]
+	path = resources/leaflet-locatecontrol
+	url = https://github.com/domoritz/leaflet-locatecontrol.git
+[submodule "resources/leaflet-hash"]
+	path = resources/leaflet-hash
+	url = https://github.com/mlevans/leaflet-hash.git

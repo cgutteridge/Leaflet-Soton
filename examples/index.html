@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaflet Soton - Documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <style>
+/* Adapted from a stylesheet by Edward O'Connor */
+/* http://edward.oconnor.cx/ */
+
+/* Undo default HTML styling of some elements */
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: normal;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+}
+
+/* Basic layout */
+
+body {
+  margin: 1.3125em auto 0 auto;
+  padding: 0;
+  width: 80em;
+  max-width: 98%;
+  hyphens: auto;
+}
+
+p {
+  font-size: large;
+  margin: 1.3125em 0;
+  padding: 0;
+}
+
+li {
+  font-size: large;
+  padding: 0;
+}
+
+/* Typography */
+
+/*  6pt = 0.375em
+ *  7pt = 0.4375em
+ *  8pt = 0.5em
+ *  9pt = 0.5625em
+ * 10pt = 0.625em
+ * 11pt = 0.6875em
+ * 12pt = 0.75em
+ * 14pt = 0.875em
+ * 16pt = 1em
+ * 18pt = 1.125em
+ * 21pt = 1.3125em
+ * 24pt = 1.5em
+ * 36pt = 2.25em
+ * 48pt = 3em
+ * 60pt = 3.75em
+ * 72pt = 4.5em
+ */
+
+body {
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  font-size: 100%;
+  line-height: 1.625;
+}
+
+h1 { font-size: 2.25em;   line-height: 1.167; margin-bottom: .75em}
+h2 { font-size: 2em;      line-height: 3; margin-bottom: .75em}
+h3 { font-size: 1.3125em; line-height: 2; margin-bottom: .75em}
+h4 { font-size: 1.25em;   line-height: 1.05; }
+h5 { font-size: 1.125em;  line-height: 1.167; }
+h6 { font-size: 1em;      line-height: 1.3125; }
+    </style>
+
+    <link rel="stylesheet" href="../src/leaflet-soton.css" />
+
+    <link rel="stylesheet" href="../resources/leaflet/dist/leaflet.css" />
+
+    <script type="text/javascript" src="../resources/syntaxhighlighter/pkg/scripts/shCore.js"></script>
+    <script type="text/javascript" src="../resources/syntaxhighlighter/pkg/scripts/shBrushJScript.js"></script>
+    <script type="text/javascript" src="../resources/syntaxhighlighter/pkg/scripts/shBrushXml.js"></script>
+    <link type="text/css" rel="stylesheet" href="../resources/syntaxhighlighter/pkg/styles/shCoreDefault.css"/>
+    <script type="text/javascript">SyntaxHighlighter.all();</script>
+</head>
+<body>
+    <h1>An Introduction to OpenStreetMap and the University of Southampton</h1>
+
+    <h2>OpenStreetMap</h2>
+    <table>
+        <tr>
+            <td>
+                <p>
+
+                The OpenStreetMap project was started in 2004 with the aim of
+                creating a free map of the world. The core, but perhaps less
+                obvious output from the project is the data. You can see an
+                example of some OSM data, represented in XML on the right.
+
+                </p>
+                <p>
+
+                This abreviated data describes the Zepler building on Highfield
+                Campus. You can see in the tags, that the building name,
+                number, and uri are present.
+
+                </p>
+            </td>
+            <td>
+                <script type="syntaxhighlighter" class="brush: xml"><![CDATA[
+                <?xml version='1.0' encoding='UTF-8'?>
+                <osm version='0.6'>
+                    <node id='304648094' lat='50.9371225' lon='-1.397536' />
+                    <node id='304648184' lat='50.9375162' lon='-1.3976054' />
+                    ...
+                    <node id='2628668610' lat='50.9371174' lon='-1.3976749' />
+                    <way id='27743656'>
+                        <nd ref='1550130370' />
+                        ...
+                        <nd ref='1550130274' />
+                        <nd ref='1550130370' />
+                        <tag k='building' v='yes' />
+                        <tag k='loc_ref' v='59' />
+                        <tag k='name' v='Zepler' />
+                        <tag k='uri' v='http://id.southampton.ac.uk/building/59' />
+                    </way>
+                </osm>
+                ]]></script>
+            </td>
+        </tr>
+    </table>
+
+    <h2>Slippy Maps</h2>
+    <table>
+        <tr>
+            <td>
+                <img src="http://a.tile.openstreetmap.org/16/32513/21958.png" />
+            </td>
+            <td>
+                <h3>Data to Images (or Tiles)</h3>
+                <p>
+
+                XML is perhaps not the best way to view the data if you want to
+                use if for navigation, so this data can be rendered in to
+                images for use in a map. Shown here is the "Standard" rendering
+                of part of Highfield campus.
+
+                </p>
+                <p>
+
+                This tile has been downloaded from the OpenStreetMap tile
+                servers. A tileserver is normally composed of a database
+                (usually postgresql with postgis), a tile rendering stack
+                (e.g.  renderd and mapnik) and a webserver (e.g. apache with
+                mod_tile).
+
+                </p>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <h3>Leaflet</h3>
+                <p>
+
+                There are a few libraries that can handle displaying a "slippy"
+                map, the one in use here is called leaflet. Tiles like the one
+                shown above are combined together in to a grid that can be
+                moved with the mouse.
+
+                </p>
+                <p>
+
+                The javascript used to create the map seen on the right is shown below.
+
+                </p>
+
+                <pre class="brush: js;">
+                var map1 = L.map('zepler-osm');
+
+                map1.setView([50.93733, -1.39779], 19);
+
+                L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19
+                }).addTo(map1);
+                </pre>
+            </td>
+            <td>
+                <div id="zepler-osm" style="height: 500px; width: 100%;"></div>
+            </td>
+        </tr>
+    </table>
+    <h2>Custom Maps for the University</h2>
+    <table>
+        <tr>
+            <td>
+                <div id="sum-carto" style="height: 500px; width: 600px;"></div>
+            </td>
+            <td>
+                <h3>Custom Rendering (sum-carto)</h3>
+                <p>
+
+                Jumping back to tileservers, the rendering stack decides how to
+                display the data as an image. Mapnik, which is commonly used
+                has an xml stylesheet that it uses, this can be (and in the
+                case of the "Standard" OSM style, is)  generated from another
+                CSS like language called carto.
+
+                </p>
+                <p>
+
+                The "Standard" OSM rendering has some disadvantages for the
+                University. Probably the biggest is that it shows some
+                irelevent things, e.g. housenumbers for the surrounding
+                residential area, it also does not show relevent things e.g.
+                building numbers, cycle parking, ...
+
+                </p>
+                <p>
+
+                To the left, you can see the same view as before, but this
+                time, the data has been rendered according to a different
+                stylesheet.  Notice that the buildings number is displayed
+                below the name, and that some cycle parking is shown just to
+                the top right of the Zepler building (green P).
+
+                </p>
+                <p>
+
+                Currently there are two tileservers hosting this University
+                specific tileset. Inside ECS there is
+                kanga-cb15g11.ecs.soton.ac.uk, which is updated daily. Outside
+                of ECS, there is altair.cbaines.net, which is rarely updated.
+
+                </p>
+                <pre class="brush: js;">
+                var map2 = L.map('sum-carto');
+
+                map2.setView([50.93733, -1.39779], 19);
+
+                L.tileLayer('http://kanga-cb15g11.ecs.soton.ac.uk/sum/{z}/{x}/{y}.png', {
+                    maxZoom: 19
+                }).addTo(map2);
+                </pre>
+            </td>
+        </tr>
+    </table>
+    <h2>Interactivity</h2>
+    <table>
+        <tr>
+            <td>
+                <h2>sum</h2>
+                <p>
+
+                So far we have seen static maps, and slippy maps. But extra
+                interactivty can be used to enhance slippy maps with more data
+                where available. The University is off to a good start with
+                this data, and some of it can be interacted with through the
+                map.
+
+                </p>
+                <p>
+
+                The sum (TODO: Find better name) library allows you to add this
+                interactivity to the map with ease, its mainly clientside, with
+                a small server side component. It handles everything from
+                setting up Leaflet, to advanced interactive components.
+
+                </p>
+                <p>
+
+                Try clicking on the buildings and the bicycle parking.
+
+                </p>
+                <pre class="brush: js;">
+                var map3 = LS.map('sum-basic');
+                </pre>
+            </td>
+            <td>
+                <div id="sum-basic" style="width: 100%; height: 500px;"></div>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <div id="sum-workstations" style="width: 100%; height: 500px;"></div>
+            </td>
+            <td>
+                <h3>Workstations</h3>
+                <p>
+
+                One of the very useful pieces of information published by the
+                University is the workstation use data. On the left you can see
+                this being displayed on the map.
+
+                </p>
+                <p>
+
+                As you zoom in and out, the workstation markers will group
+                together and split apart to keep the data visible. All markers
+                are also interactive and display more data in a popup when
+                clicked on.
+
+                </p>
+                <pre class="brush: js;">
+                var map4 = LS.map('sum-workstations', {
+                    workstations: true
+                });
+                </pre>
+            </td>
+        </tr>
+    </table>
+    <h2> Future Experimental Features</h2>
+    <table>
+        <tr>
+            <td>
+                <h3>Indoor Maps</h3>
+                <p>
+
+                Navigating around the University is slightly different from
+                navigating around a city, e.g. Southampton or London. Most of
+                navigation for students and staff of the university involves
+                moving between rooms.
+
+                </p>
+                <p>
+
+                The sum library also has an experimental indoor feature, you
+                can see a view of the library (level 2) on the left.
+
+                </p>
+            </td>
+            <td>
+                <div id="sum-indoor" style="width: 600px; height: 500px;"></div>
+            </td>
+        </tr>
+    </table>
+
+    <script src="../resources/leaflet/dist/leaflet-src.js"></script>
+    <script src="../resources/leaflet-markercluster/dist/leaflet.markercluster.js"></script>
+
+    <script src="../src/leaflet-soton.js"></script>
+
+    <script type="text/javascript">
+        LS.dataPath = '../data.json';
+        LS.imagePath = '../resources/images/';
+
+        var map1 = L.map('zepler-osm').setView([50.93733, -1.39779], 19);
+
+        L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map1);
+
+        var map2 = L.map('sum-carto').setView([50.93733, -1.39779], 19);
+
+        L.tileLayer('http://kanga-cb15g11.ecs.soton.ac.uk/sum/{z}/{x}/{y}.png', {
+            maxZoom: 22
+        }).addTo(map2);
+
+        var map3 = LS.map('sum-basic');
+
+        var map4 = LS.map('sum-workstations', {
+            workstations: true
+        });
+
+        var map5 = LS.map('sum-indoor', {
+            workstations: true,
+            indoor: true,
+            center: [50.93471, -1.3957],
+            zoom: 20,
+            level: "2"
+        });
+    </script>
+</body>
+</html>
