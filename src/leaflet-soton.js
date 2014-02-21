@@ -1677,13 +1677,25 @@ L.IndoorLayer = L.Class.extend({
                 return;
             }
 
-            if (level in layers) {
-                layer = layers[level];
-            } else {
-                layer = layers[level] = L.geoJson({ type: "FeatureCollection", features: [] }, options);
-            }
+            if (L.Util.isArray(level)) {
+                level.forEach(function(level) {
+                    if (level in layers) {
+                        layer = layers[level];
+                    } else {
+                        layer = layers[level] = L.geoJson({ type: "FeatureCollection", features: [] }, options);
+                    }
 
-            layer.addData(part);
+                    layer.addData(part);
+                });
+            } else {
+                if (level in layers) {
+                    layer = layers[level];
+                } else {
+                    layer = layers[level] = L.geoJson({ type: "FeatureCollection", features: [] }, options);
+                }
+
+                layer.addData(part);
+            }
         });
     },
     getLevels: function() {

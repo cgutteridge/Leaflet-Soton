@@ -309,12 +309,18 @@ function createRooms(buildings, workstations, callback) {
                         });
                     }, function(err) {
 
-                        osmIDToLevel = {};
+                        osmIDToLevels = {};
 
                         async.each(levelRelations, function(level, callback) {
                             getBuildingPartMemberRefs(level, function(err, refs) {
                                 for (var i=0; i<refs.length; i++) {
-                                    osmIDToLevel[refs[i]] = parseInt(level.tags.level, 10);
+                                    var ref = refs[i];
+
+                                    if (!(ref in osmIDToLevels)) {
+                                        osmIDToLevels[ref] = [];
+                                    }
+
+                                    osmIDToLevels[refs[i]].push(parseInt(level.tags.level, 10));
                                 }
                                 callback();
                             });
@@ -322,8 +328,12 @@ function createRooms(buildings, workstations, callback) {
                             for (var i=0; i<buildingParts.length; i++) {
                                 var part = buildingParts[i];
 
-                                if (part.id in osmIDToLevel) {
-                                    part.properties.level = osmIDToLevel[part.id];
+                                if (part.id in osmIDToLevels) {
+                                    part.properties.level = osmIDToLevels[part.id];
+
+                                    if (part.properties.level.length === 1) {
+                                        part.properties.level = part.properties.level[0];
+                                    }
                                 } else {
                                     console.log("unknown level");
                                     console.log(JSON.stringify(part, null, 4));
