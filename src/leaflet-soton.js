@@ -449,14 +449,20 @@ SELECT * WHERE {\
                                     return;
                                 }
 
-                                if (partWorkstation && partWorkstation.feature in workstationData) {
-                                    var workstationIcon = '<div class="ls-workstationicon" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + 'workstation-group.png' + ')"><div style="padding-left: 26px;">';
+                                if (partWorkstation) {
+                                    if (partWorkstation.feature in workstationData) {
+                                        var workstationIcon = '<div class="ls-workstationicon" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + 'workstation-group.png' + ')"><div style="padding-left: 26px;">';
 
-                                    var freeSeats = workstationData[partWorkstation.feature].free_seats;
+                                        var freeSeats = workstationData[partWorkstation.feature].free_seats;
 
-                                    workstationIcon += freeSeats + "</div></div>";
+                                        workstationIcon += freeSeats + "</div></div>";
 
-                                    content = workstationIcon + content;
+                                        content = workstationIcon + content;
+                                    } else {
+                                        var workstationIcon = '<div style="margin-left: auto; margin-right: auto; width: 32px; height: 32px; background-image: url(' + LS.imagePath + 'workstation.png' + ')"></div>';
+
+                                        content = workstationIcon + content;
+                                    }
                                 }
 
                                 var myIcon = L.divIcon({
@@ -1354,14 +1360,22 @@ SELECT * WHERE {\
     }
 
     var WorkstationIcon = L.DivIcon.extend({
-        initialize: function(workstations, workstationState) {
+        initialize: function(workstations, workstationData) {
             var html = '<div style="padding-left: 26px;">';
 
             var freeSeats = 0;
 
             var allClosed = true;
+            var someStateKnown = false;
 
-            var openIcon = {
+            var generalIcon = {
+                iconUrl: LS.imagePath + "workstation.png",
+                iconSize:     [32, 32],
+                iconAnchor:   [16, 16],
+                className: 'ls-workstationicon'
+            }
+
+            var openIconWithState = {
                 iconUrl: LS.imagePath + "workstation-group.png",
                 iconSize:     [66, 32],
                 iconAnchor:   [33, 16],
@@ -1376,30 +1390,32 @@ SELECT * WHERE {\
             }
 
             workstations.forEach(function(workstation) {
-                if (workstation in workstationState) {
-                    var state = workstationState[workstation];
+                if (workstation in workstationData) {
+                    var state = workstationData[workstation];
 
                     var closed = (state.status.indexOf("closed") !== -1)
                     allClosed = allClosed && closed;
 
-                    freeSeats += workstationState[workstation].free_seats;
+                    freeSeats += workstationData[workstation].free_seats;
+
+                    someStateKnown = true;
                 }
             });
 
-            this._closed = allClosed;
-
             var iconUrl;
 
-            if (!this._closed) {
-                html += freeSeats + "</div>";
+            if (someStateKnown) {
+                if (allClosed) {
+                    L.setOptions(this, closedIcon);
+                } else {
+                    html += freeSeats + "</div>";
 
-                openIcon.html = html;
+                    openIconWithState.html = html;
 
-                L.setOptions(this, openIcon);
+                    L.setOptions(this, openIconWithState);
+                }
             } else {
-                html += "</div>";
-
-                L.setOptions(this, closedIcon);
+                L.setOptions(this, generalIcon);
             }
         },
         createIcon: function (oldIcon) {
@@ -1445,10 +1461,18 @@ SELECT * WHERE {\
                             workstationLayer._map.showByURI(uri);
                         };
 
+                        var text;
                         if (typeof state !== 'undefined') {
-                            var text = document.createTextNode(" " + state.free_seats + " free seats (" + state.total_seats + " total seats)");
-                            div.appendChild(text);
+                            var closed = (state.status.indexOf("closed") !== -1)
+                            if (!closed) {
+                                text = document.createTextNode(" " + state.free_seats + " free seats (" + state.total_seats + " total seats) " + state.status);
+                            } else {
+                                text = document.createTextNode(" " + state.status);
+                            }
+                        } else {
+                            text = document.createTextNode(" State Unknown");
                         }
+                        div.appendChild(text);
 
                         var br = document.createElement("br");
                         div.appendChild(br);
