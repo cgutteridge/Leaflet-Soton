@@ -85,6 +85,16 @@ h6 { font-size: 1em;      line-height: 1.3125; }
 <body>
     <h1>An Introduction to OpenStreetMap and the University of Southampton</h1>
 
+    Full page map examples
+    <ul>
+        <li><a href="basic.html">Basic Example</a></li>
+        <li><a href="full.html">Full Example</a></li>
+        <li><a href="buildingsearch.html">Building Search Example</a></li>
+        <li><a href="indoor.html">Indoor Example</a></li>
+        <li><a href="workstations.html">Workstations Example</a></li>
+        <li><a href="zepler.html">Zepler Example</a></li>
+    </ul>
+
     <h2>OpenStreetMap</h2>
     <table>
         <tr>
@@ -228,7 +238,7 @@ h6 { font-size: 1em;      line-height: 1.3125; }
                 Currently there are two tileservers hosting this University
                 specific tileset. Inside ECS there is
                 kanga-cb15g11.ecs.soton.ac.uk, which is updated daily. Outside
-                of ECS, there is altair.cbaines.net, which is rarely updated.
+                of ECS, there is bus.southampton.ac.uk.
 
                 </p>
                 <pre class="brush: js;">
@@ -236,7 +246,7 @@ h6 { font-size: 1em;      line-height: 1.3125; }
 
                 map2.setView([50.93733, -1.39779], 19);
 
-                L.tileLayer('http://kanga-cb15g11.ecs.soton.ac.uk/sum/{z}/{x}/{y}.png', {
+                L.tileLayer('http://bus.southampton.ac.uk/graphics/map/tiles/{z}/{x}/{y}.png', {
                     maxZoom: 19
                 }).addTo(map2);
                 </pre>
@@ -247,7 +257,7 @@ h6 { font-size: 1em;      line-height: 1.3125; }
     <table>
         <tr>
             <td>
-                <h2>sum</h2>
+                <h2>leaflet-soton</h2>
                 <p>
 
                 So far we have seen static maps, and slippy maps. But extra
@@ -259,7 +269,8 @@ h6 { font-size: 1em;      line-height: 1.3125; }
                 </p>
                 <p>
 
-                The sum (TODO: Find better name) library allows you to add this
+                The <a href="https://sourcekettle.ecs.soton.ac.uk/project/leaflet-soton/">
+                leaflet-soton</a> library allows you to add this
                 interactivity to the map with ease, its mainly clientside, with
                 a small server side component. It handles everything from
                 setting up Leaflet, to advanced interactive components.
@@ -322,7 +333,7 @@ h6 { font-size: 1em;      line-height: 1.3125; }
                 </p>
                 <p>
 
-                The sum library also has an experimental indoor feature, you
+                The leaflet-soton library also has an experimental indoor feature, you
                 can see a view of the library (level 2) on the left.
 
                 </p>
@@ -350,7 +361,7 @@ h6 { font-size: 1em;      line-height: 1.3125; }
 
         var map2 = L.map('sum-carto').setView([50.93733, -1.39779], 19);
 
-        L.tileLayer('http://kanga-cb15g11.ecs.soton.ac.uk/sum/{z}/{x}/{y}.png', {
+        L.tileLayer('http://bus.southampton.ac.uk/graphics/map/tiles/{z}/{x}/{y}.png', {
             maxZoom: 22
         }).addTo(map2);
 
