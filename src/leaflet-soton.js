@@ -484,11 +484,29 @@ SELECT * WHERE {\
 
                                 if (partWorkstation) {
                                     if (partWorkstation.feature in workstationData) {
-                                        var workstationIcon = '<div class="ls-workstationicon" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + 'workstation-group.png' + ')"><div style="padding-left: 26px;">';
+                                        var state = workstationData[partWorkstation.feature];
 
-                                        var freeSeats = workstationData[partWorkstation.feature].free_seats;
+                                        var closed = (state.status.indexOf("closed") !== -1)
 
-                                        workstationIcon += freeSeats + "</div></div>";
+                                        var image;
+                                        var workstationIcon;
+
+                                        if (!closed) {
+                                            image = 'workstation-group.png';
+                                            workstationIcon = '<div class="ls-workstationicon" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + image + ')">';
+                                        } else {
+                                            image = 'workstation-closed.png';
+                                            workstationIcon = '<div class="ls-workstationicon-small" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + image + ')">';
+                                        }
+
+                                        if (!closed) {
+                                            workstationIcon += '<div style="padding-left: 26px;">';
+
+                                            var freeSeats = state.free_seats;
+                                            workstationIcon += freeSeats + "</div>";
+                                        }
+
+                                        workstationIcon += '</div>';
 
                                         content = workstationIcon + content;
                                     } else {
