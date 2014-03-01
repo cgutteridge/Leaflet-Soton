@@ -38,6 +38,39 @@
                 }
             }
         },
+        getRoomFor: function(uri) {
+            var parts = LS.data.buildingParts.features;
+
+            for (var i=0; i<parts.length; i++) {
+                var part = parts[i];
+
+                if (part.properties.buildingpart !== "room")
+                    continue;
+
+                var contents = part.properties.contents;
+
+                for (var j=0; j<contents.length; j++) {
+                    var content = contents[j];
+
+                    if (content.feature === uri) {
+                        return part;
+                    }
+                }
+
+                var features = part.properties.features;
+
+                for (var j=0; j<features.length; j++) {
+                    var feature = features[j];
+
+                    if (feature.feature === uri) {
+                        return part;
+                    }
+                }
+            }
+
+            return null;
+
+        },
         getFeatureByURI: function(uri) {
             var features, feature;
 
@@ -643,17 +676,30 @@ SELECT * WHERE {\
                 var coords = L.GeoJSON.coordsToLatLngs(feature.geometry.coordinates[0], 0, L.GeoJSON.coordsToLatLng);
                 var bounds = L.latLngBounds(coords);
                 this.fitBounds(bounds);
+
                 if ("level" in feature.properties) {
                     this.setLevel(feature.properties.level);
                 }
+
                 this.closePopup();
 
                 return;
             } else if (feature.geometry.type === "Point") {
                 this.setView(L.GeoJSON.coordsToLatLng(feature.geometry.coordinates), 22);
+
                 if ("level" in feature.properties) {
                     this.setLevel(feature.properties.level);
+                } else {
+                    // If this is a workstation
+                    if (uri.indexOf("http://id.southampton.ac.uk/point-of-service/workstations") === 0) {
+                        var room = LS.getRoomFor(uri);
+
+                        if (room !== null) {
+                            this.setLevel(room.properties.level);
+                        }
+                    }
                 }
+
                 this.closePopup();
                 return;
             } else {
