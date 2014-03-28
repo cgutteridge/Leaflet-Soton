@@ -1068,9 +1068,15 @@ function createBusStop(stopArea, routes, callback) {
 
                         var routeArray = "{" + routes.join(", ") + "}";
 
+                        var uri = stopArea.tags.uri;
+
+                        if (uri.indexOf("http://transport.data.gov.uk/id/stop-point/") === 0) {
+                            uri = "http://id.southampton.ac.uk/bus-stop/" + uri.slice(43);
+                        }
+
                         var pgQuery = "insert into uni_bus_stop values(ST_SetSRID(ST_MakePoint("
                         pgQuery = pgQuery + node.geometry.coordinates[0] + ", " + node.geometry.coordinates[1];
-                        pgQuery = pgQuery + "),4326), '" + name + "', '" + stopArea.tags.uri + "', '" + routeArray + "');";
+                        pgQuery = pgQuery + "),4326), '" + name + "', '" + uri + "', '" + routeArray + "');";
 
                         pg.query(pgQuery, function(err, result) {
                             if (err) {
