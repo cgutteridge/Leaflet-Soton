@@ -1159,30 +1159,25 @@ SELECT * WHERE {\
     function busStopTemplate(properties) {
         return getTemplateWrapper(properties, function(content) {
 
-        /*<tr><td>Routes: \
-            <%  each(properties.routes, function(route) { %>\
-                    <font color="<%= route.colour %>"><%= route.ref %></font>\
-            <%  }); %>\
-        </td></tr>\
-        <tr>\
-            <td colspan=2><iframe width="400px" height="100%" style="border: solid 1px #000" src="<%\
-                var parts = properties.uri.split("/");\
-                var id = parts[parts.length - 1].split(".")[0];\
-                print("http://data.southampton.ac.uk/bus-stop/" + id + ".html?view=iframe");\
-            %>" frameBorder="0"></iframe></td>\
-        </tr>\*/
+            var routeList = document.createElement("ul");
 
-            /*var parts = properties.uri.split("/");
-            var id = parts[parts.length - 1].split(".")[0];
-            var src = "http://data.southampton.ac.uk/bus-stop/" + id + ".html?view=iframe";
+            properties.routes.forEach(function(route) {
+                var routeLi = document.createElement("li");
+                routeLi.textContent = route;
 
-            var energyIFrame = document.createElement('iframe');
-            energyIFrame.setAttribute('src', src);
-            energyIFrame.setAttribute('frameBorder', '0');
-            energyIFrame.setAttribute('style', 'width: 100%; height 100%;');
+                routeList.appendChild(routeLi);
+            });
 
-            content.appendChild(energyIFrame);*/
+            content.appendChild(routeList);
 
+            var IFrame = document.createElement('iframe');
+            IFrame.setAttribute('src', 'http://bus.southampton.ac.uk/bus-stop-iframe/' + properties.uri.slice(42)  + ".html")
+            IFrame.setAttribute('frameBorder', '0');
+            IFrame.setAttribute('style', 'width: 100%; height 100%;');
+
+            content.appendChild(IFrame);
+
+            console.log(properties);
         });
     }
 
