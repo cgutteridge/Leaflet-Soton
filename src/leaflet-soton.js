@@ -426,6 +426,8 @@ SELECT * WHERE {\
                             var fill = 'white';
                             if (feature.properties.buildingpart === 'corridor') {
                                 fill = '#169EC6';
+                            } else if (feature.properties.buildingpart === 'verticalpassage') {
+                                fill = '#0A485B';
                             }
 
                             return {
@@ -529,13 +531,21 @@ SELECT * WHERE {\
                             }
                         },
                         onEachFeature: function(feature, layer) {
+                            if (feature.properties.buildingpart === "corridor") {
+                                return; // No popup for corridors yet
+                            }
+
                             layer.on('click', function(e) {
                                 var content;
                                 var popupOptions = {};
 
                                 // When the feature is clicked on
                                 if ("buildingpart" in feature.properties) {
-                                    content = roomPopupTemplate(feature.properties);
+                                    if (feature.properties.buildingpart === "room") {
+                                        content = roomPopupTemplate(feature.properties);
+                                    } else if (feature.properties.buildingpart === "verticalpassage") {
+                                        content = verticalPassagePopupTemplate(feature.properties);
+                                    }
                                 } else { // Assume that it is a printer
                                     // TODO: Use different icons where appropriate
                                     popupOptions.offset = icons.vendingHotDrinks.options.popupAnchor;
@@ -839,6 +849,40 @@ SELECT * WHERE {\
                 properties.images.forEach(function(image) {
 
                 });
+            }
+        });
+    }
+
+    function verticalPassagePopupTemplate(properties) {
+        properties = L.extend({}, properties);
+
+        if (!("name" in properties)) {
+            if (properties["buildingpart:verticalpassage"] === "stairway") {
+                properties.name = "Stairway";
+            } else {
+                properties.name = "Vertical Passage";
+            }
+
+            if ("ref" in properties) {
+                properties.name += properties.ref;
+            }
+        }
+
+        return getTemplateWrapper(properties, function(content) {
+
+            if ("level" in properties) {
+                content.appendChild(document.createTextNode("Levels:"));
+
+                var levelList = document.createElement("ul");
+
+                properties.level.forEach(function(level) {
+                    var levelLi = document.createElement("li");
+                    levelLi.textContent = level;
+
+                    levelList.appendChild(levelLi);
+                });
+
+                content.appendChild(levelList);
             }
         });
     }

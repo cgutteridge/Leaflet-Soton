@@ -325,11 +325,15 @@ function createRooms(buildings, workstations, callback) {
                                 callback();
                             });
                         }, function(err) {
+                            // Assign levels to parts
+
                             for (var i=0; i<buildingParts.length; i++) {
                                 var part = buildingParts[i];
 
                                 if (part.id in osmIDToLevels) {
                                     part.properties.level = osmIDToLevels[part.id];
+
+                                    part.properties.level.sort(function(a,b){return a-b});
 
                                     if (part.properties.level.length === 1) {
                                         part.properties.level = part.properties.level[0];
@@ -466,7 +470,7 @@ function getBuildingPartMemberRefs(levelRelation, callback) {
 }
 
 function getBuildingParts(callback) {
-    var query = "select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,ST_AsText(ST_Transform(ST_Centroid(way), 4326)) as center,osm_id,name,buildingpart,ref,uri,amenity,unisex,male,female from planet_osm_polygon where buildingpart is not null";
+    var query = "select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,ST_AsText(ST_Transform(ST_Centroid(way), 4326)) as center,osm_id,name,buildingpart,\"buildingpart:verticalpassage\",ref,uri,amenity,unisex,male,female from planet_osm_polygon where buildingpart is not null";
 
     pg.query(query, function(err, results) {
         if (err) {
