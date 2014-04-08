@@ -418,179 +418,182 @@ SELECT * WHERE {\
 
                 LS.getWorkstationData(function(workstationData) {
 
-                                                                       // Adding .features means leaflet will
-                                                                       // ignore those without a geometry
-                    map.indoorLayer = L.indoorLayer(data.buildingParts.features, {
-                        level: map._startLevel,
-                        style: function(feature) {
-                            var fill = 'white';
-                            if (feature.properties.buildingpart === 'corridor') {
-                                fill = '#169EC6';
-                            } else if (feature.properties.buildingpart === 'verticalpassage') {
-                                fill = '#0A485B';
-                            }
-
-                            return {
-                                fillColor: fill,
-                                weight: 1,
-                                color: '#666',
-                                fillOpacity: 1
-                            };
-                        },
-                        markerForFeature: function(part) {
-                            if (part.properties.buildingpart === "room") {
-
-                                var iconCoords = part.properties.center;
-
-                                if (part.properties.name === "The Bridge") {
-                                    return L.marker(iconCoords, {icon: icons.theBridge});
-                                } else if (part.properties.name === "SUSU Shop") {
-                                    return L.marker(iconCoords, {icon: icons.theSUSUShop});
-                                } else if (part.properties.name === "The Stag's") {
-                                    return L.marker(iconCoords, {icon: icons.theStags});
-                                } else if (part.properties.name === "SUSU Cafe") {
-                                    return L.marker(iconCoords, {icon: icons.theSUSUCafe});
+                    if (options.indoor) {
+                                                                           // Adding .features means leaflet will
+                                                                           // ignore those without a geometry
+                        map.indoorLayer = L.indoor(data.buildingParts.features, {
+                            level: map._startLevel,
+                            style: function(feature) {
+                                var fill = 'white';
+                                if (feature.properties.buildingpart === 'corridor') {
+                                    fill = '#169EC6';
+                                } else if (feature.properties.buildingpart === 'verticalpassage') {
+                                    fill = '#0A485B';
                                 }
 
-                                var partWorkstation = null;
+                                return {
+                                    fillColor: fill,
+                                    weight: 1,
+                                    color: '#666',
+                                    fillOpacity: 1
+                                };
+                            },
+                            markerForFeature: function(part) {
+                                if (part.properties.buildingpart === "room") {
 
-                                if ('contents' in part.properties) {
-                                    part.properties.contents.forEach(function(feature) {
-                                        if (feature.subject === "http://id.southampton.ac.uk/point-of-interest-category/iSolutions-Workstations") {
-                                            partWorkstation = feature;
-                                        }
-                                    });
-                                }
+                                    var iconCoords = part.properties.center;
 
-                                if (part.properties.amenity === "toilets") {
-                                    if ("male" in part.properties) {
-                                        return L.marker(iconCoords, {icon: icons.toiletsMale});
-                                    } else if ("female" in part.properties) {
-                                        return L.marker(iconCoords, {icon: icons.toiletsFemale});
-                                    } else if ("unisex" in part.properties) {
-                                        return L.marker(iconCoords, {icon: icons.toiletsUnisex});
-                                    } // TODO: Disabled
-                                }
+                                    if (part.properties.name === "The Bridge") {
+                                        return L.marker(iconCoords, {icon: icons.theBridge});
+                                    } else if (part.properties.name === "SUSU Shop") {
+                                        return L.marker(iconCoords, {icon: icons.theSUSUShop});
+                                    } else if (part.properties.name === "The Stag's") {
+                                        return L.marker(iconCoords, {icon: icons.theStags});
+                                    } else if (part.properties.name === "SUSU Cafe") {
+                                        return L.marker(iconCoords, {icon: icons.theSUSUCafe});
+                                    }
 
-                                var content;
+                                    var partWorkstation = null;
 
-                                if ("name" in part.properties && "ref" in part.properties) {
-                                    content = part.properties.name + " (" + part.properties.ref + ")";
-                                } else if ("ref" in part.properties) {
-                                    content = "Room " + part.properties.ref;
-                                } else if ("name" in part.properties) {
-                                    content = part.properties.name;
-                                } else {
-                                    return;
-                                }
+                                    if ('contents' in part.properties) {
+                                        part.properties.contents.forEach(function(feature) {
+                                            if (feature.subject === "http://id.southampton.ac.uk/point-of-interest-category/iSolutions-Workstations") {
+                                                partWorkstation = feature;
+                                            }
+                                        });
+                                    }
 
-                                if (partWorkstation) {
-                                    if (partWorkstation.feature in workstationData) {
-                                        var state = workstationData[partWorkstation.feature];
+                                    if (part.properties.amenity === "toilets") {
+                                        if ("male" in part.properties) {
+                                            return L.marker(iconCoords, {icon: icons.toiletsMale});
+                                        } else if ("female" in part.properties) {
+                                            return L.marker(iconCoords, {icon: icons.toiletsFemale});
+                                        } else if ("unisex" in part.properties) {
+                                            return L.marker(iconCoords, {icon: icons.toiletsUnisex});
+                                        } // TODO: Disabled
+                                    }
 
-                                        var closed = (state.status.indexOf("closed") !== -1)
+                                    var content;
 
-                                        var image;
-                                        var workstationIcon;
+                                    if ("name" in part.properties && "ref" in part.properties) {
+                                        content = part.properties.name + " (" + part.properties.ref + ")";
+                                    } else if ("ref" in part.properties) {
+                                        content = "Room " + part.properties.ref;
+                                    } else if ("name" in part.properties) {
+                                        content = part.properties.name;
+                                    } else {
+                                        return;
+                                    }
 
-                                        if (!closed) {
-                                            image = 'workstation-group.png';
-                                            workstationIcon = '<div class="ls-workstationicon" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + image + ')">';
+                                    if (partWorkstation) {
+                                        if (partWorkstation.feature in workstationData) {
+                                            var state = workstationData[partWorkstation.feature];
+
+                                            var closed = (state.status.indexOf("closed") !== -1)
+
+                                            var image;
+                                            var workstationIcon;
+
+                                            if (!closed) {
+                                                image = 'workstation-group.png';
+                                                workstationIcon = '<div class="ls-workstationicon" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + image + ')">';
+                                            } else {
+                                                image = 'workstation-closed.png';
+                                                workstationIcon = '<div class="ls-workstationicon-small" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + image + ')">';
+                                            }
+
+                                            if (!closed) {
+                                                workstationIcon += '<div style="padding-left: 26px;">';
+
+                                                var freeSeats = state.free_seats;
+                                                workstationIcon += freeSeats + "</div>";
+                                            }
+
+                                            workstationIcon += '</div>';
+
+                                            content = workstationIcon + content;
                                         } else {
-                                            image = 'workstation-closed.png';
-                                            workstationIcon = '<div class="ls-workstationicon-small" style="margin-left: auto; margin-right: auto; background-image: url(' + LS.imagePath + image + ')">';
+                                            var workstationIcon = '<div style="margin-left: auto; margin-right: auto; width: 32px; height: 32px; background-image: url(' + LS.imagePath + 'workstation.png' + ')"></div>';
+
+                                            content = workstationIcon + content;
                                         }
-
-                                        if (!closed) {
-                                            workstationIcon += '<div style="padding-left: 26px;">';
-
-                                            var freeSeats = state.free_seats;
-                                            workstationIcon += freeSeats + "</div>";
-                                        }
-
-                                        workstationIcon += '</div>';
-
-                                        content = workstationIcon + content;
-                                    } else {
-                                        var workstationIcon = '<div style="margin-left: auto; margin-right: auto; width: 32px; height: 32px; background-image: url(' + LS.imagePath + 'workstation.png' + ')"></div>';
-
-                                        content = workstationIcon + content;
                                     }
+
+                                    var myIcon = L.divIcon({
+                                        className: 'ls-room-marker',
+                                        html: content,
+                                        iconSize: new L.Point(100, 30),
+                                        iconAnchor: new L.Point(50, 15)
+                                    });
+
+                                    var marker = L.marker(iconCoords, {icon: myIcon});
+
+                                    return marker;
+                                }
+                            },
+                            onEachFeature: function(feature, layer) {
+                                if (feature.properties.buildingpart === "corridor") {
+                                    return; // No popup for corridors yet
                                 }
 
-                                var myIcon = L.divIcon({
-                                    className: 'ls-room-marker',
-                                    html: content,
-                                    iconSize: new L.Point(100, 30),
-                                    iconAnchor: new L.Point(50, 15)
+                                layer.on('click', function(e) {
+                                    var content;
+                                    var popupOptions = {};
+
+                                    // When the feature is clicked on
+                                    if ("buildingpart" in feature.properties) {
+                                        if (feature.properties.buildingpart === "room") {
+                                            content = roomPopupTemplate(feature.properties);
+                                        } else if (feature.properties.buildingpart === "verticalpassage") {
+                                            content = verticalPassagePopupTemplate(feature.properties);
+                                        }
+                                    } else { // Assume that it is a printer
+                                        // TODO: Use different icons where appropriate
+                                        popupOptions.offset = icons.vendingHotDrinks.options.popupAnchor;
+
+                                        if ('vending' in feature.properties) {
+                                            content = vendingPopupTemplate(feature.properties);
+                                        } else {
+                                            content = printerPopupTemplate(feature.properties);
+                                        }
+                                    }
+
+                                    showPopup(map, content, e.latlng, popupOptions);
                                 });
+                            },
+                            pointToLayer: function (feature, latlng) {
+                                var icon;
 
-                                var marker = L.marker(iconCoords, {icon: myIcon});
-
-                                return marker;
-                            }
-                        },
-                        onEachFeature: function(feature, layer) {
-                            if (feature.properties.buildingpart === "corridor") {
-                                return; // No popup for corridors yet
-                            }
-
-                            layer.on('click', function(e) {
-                                var content;
-                                var popupOptions = {};
-
-                                // When the feature is clicked on
-                                if ("buildingpart" in feature.properties) {
-                                    if (feature.properties.buildingpart === "room") {
-                                        content = roomPopupTemplate(feature.properties);
-                                    } else if (feature.properties.buildingpart === "verticalpassage") {
-                                        content = verticalPassagePopupTemplate(feature.properties);
-                                    }
-                                } else { // Assume that it is a printer
-                                    // TODO: Use different icons where appropriate
-                                    popupOptions.offset = icons.vendingHotDrinks.options.popupAnchor;
-
-                                    if ('vending' in feature.properties) {
-                                        content = vendingPopupTemplate(feature.properties);
+                                if ('vending' in feature.properties) {
+                                    if (feature.properties.vending === 'drinks') {
+                                        icon = icons.vendingHotDrinks;
+                                    } else if (feature.properties.vending === 'sweets') {
+                                        icon = icons.vendingSweets;
                                     } else {
-                                        content = printerPopupTemplate(feature.properties);
+                                        console.warn("Unrecognired vending " + feature.properties.vending);
                                     }
-                                }
-
-                                showPopup(map, content, e.latlng, popupOptions);
-                            });
-                        },
-                        pointToLayer: function (feature, latlng) {
-                            var icon;
-
-                            if ('vending' in feature.properties) {
-                                if (feature.properties.vending === 'drinks') {
-                                    icon = icons.vendingHotDrinks;
-                                } else if (feature.properties.vending === 'sweets') {
-                                    icon = icons.vendingSweets;
                                 } else {
-                                    console.warn("Unrecognired vending " + feature.properties.vending);
+                                    icon = icons.printer;
                                 }
-                            } else {
-                                icon = icons.printer;
+
+                                return L.marker(latlng, {icon: icon});
                             }
+                        });
 
-                            return L.marker(latlng, {icon: icon});
-                        }
-                    });
+                        map.indoorLayer.addData(data.buildingFeatures);
 
-                    map.indoorLayer.addData(data.buildingFeatures);
+                        map.levelControl = L.Control.level({
+                            levels: map.indoorLayer.getLevels(),
+                            level: map._startLevel
+                        });
 
-                    map.levelControl = L.Control.level({
-                        levels: map.indoorLayer.getLevels(),
-                        level: map._startLevel
-                    });
+                        map.levelControl.addEventListener("levelchange", map.indoorLayer.setLevel, map.indoorLayer);
 
-                    map.levelControl.addEventListener("levelchange", map.indoorLayer.setLevel, map.indoorLayer);
+                        map.levelControl.on("levelchange", function(e) {
+                            map.fireEvent("levelchange", e);
+                        });
 
-                    map.levelControl.on("levelchange", function(e) {
-                        map.fireEvent("levelchange", e);
-                    });
+                    }
 
                     var workstationMarkerLayer;
                     if (options.workstations) {
@@ -1642,219 +1645,6 @@ SELECT * WHERE {\
     }
 })();
 
-L.Control.Level = L.Control.extend({
-    includes: L.Mixin.Events,
-
-    options: {
-        position: 'bottomright',
-        parseLevel: function(level) {
-            return parseInt(level, 10);
-        }
-    },
-
-    initialize: function(options) {
-        L.setOptions(this, options);
-
-        this._map = null;
-        this._buttons = {};
-        this._listeners = [];
-        this._level = options.level;
-
-        this.addEventListener("levelchange", this._levelChange, this);
-    },
-    onAdd: function(map) {
-        var div = L.DomUtil.create('div', 'ls-levelselector');
-
-        var btnGroup = L.DomUtil.create('div', 'ls-btn-group', div);
-
-        var buttons = this._buttons;
-        var activeLevel = this._level;
-        var self = this;
-
-        this.options.levels.forEach(function(level) {
-            var cls = 'ls-btn';
-
-            var levelNum = self.options.parseLevel(level);
-
-            if (level === activeLevel || levelNum === activeLevel)
-                cls += ' active';
-
-            var levelBtn = L.DomUtil.create('button', cls, btnGroup);
-
-            levelBtn.appendChild(levelBtn.ownerDocument.createTextNode(level));
-
-            levelBtn.onclick = function() {
-                self.setLevel(level);
-            };
-
-            buttons[level] = levelBtn;
-        });
-
-        return div;
-    },
-    _levelChange: function(e) {
-        // Probably won't work in some browsers, see
-        // https://developer.mozilla.org/en-US/docs/Web/API/element.classList
-
-        if (this._map !== null) {
-            this._buttons[e.oldLevel].classList.remove('active');
-            this._buttons[e.newLevel].classList.add('active');
-        }
-    },
-    setLevel: function(level) {
-
-        if (level === this._level)
-            return;
-
-        var oldLevel = this._level;
-        this._level = level;
-
-        this.fireEvent("levelchange", {
-            oldLevel: oldLevel,
-            newLevel: level
-        });
-    },
-    getLevel: function() {
-        return this._level;
-    }
-});
-
-L.Control.level = function (options) {
-    return new L.Control.Level(options);
-};
-
-/**
- * A layer that will display indoor data
- *
- * addData takes a GeoJSON feature collection, each feature must have a level
- * property that indicates the level. If the level is a string, some function
- * will be used to rank the levels.
- *
- * getLevels can be called to get the array of levels that are present.
- *
- *
- */
-
-L.IndoorLayer = L.Class.extend({
-
-    initialize: function(data, options) {
-        L.setOptions(this, options);
-
-        var onEachFeature = options.onEachFeature;
-        var layers = this._layers = {};
-        this._map = null;
-        if ("level" in options) {
-            this._level = options.level;
-        } else {
-            this._level = null;
-        }
-
-        this.options.onEachFeature = function(feature, layer) {
-
-            onEachFeature(feature, layer);
-
-            var marker = options.markerForFeature(feature);
-            if (typeof(marker) !== 'undefined') {
-                marker.on('click', function(e) {
-                    layer.fire('click', e);
-                });
-
-                layers[feature.properties.level].addLayer(marker);
-            }
-        };
-
-        this.addData(data);
-    },
-    addTo: function (map) {
-        map.addLayer(this);
-        return this;
-    },
-    onAdd: function (map) {
-        this._map = map;
-
-        if (this._level === null) {
-            var levels = this.getLevels();
-
-            if (levels.length !== 0) {
-                this._level = levels[0];
-            }
-        }
-
-        this._map.addLayer(this._layers[this._level]);
-    },
-    onRemove: function (map) {
-        this._map.removeLayer(this._layers[this._level]);
-        this._map = null;
-    },
-    addData: function(data) {
-        var layers = this._layers;
-
-        var options = this.options;
-
-        var features = L.Util.isArray(data) ? data : data.features;
-
-        features.forEach(function (part) {
-            var level = part.properties.level;
-            var layer;
-
-            if (typeof level === 'undefined')
-                return;
-
-            if (!("geometry" in part)) {
-                return;
-            }
-
-            if (L.Util.isArray(level)) {
-                level.forEach(function(level) {
-                    if (level in layers) {
-                        layer = layers[level];
-                    } else {
-                        layer = layers[level] = L.geoJson({ type: "FeatureCollection", features: [] }, options);
-                    }
-
-                    layer.addData(part);
-                });
-            } else {
-                if (level in layers) {
-                    layer = layers[level];
-                } else {
-                    layer = layers[level] = L.geoJson({ type: "FeatureCollection", features: [] }, options);
-                }
-
-                layer.addData(part);
-            }
-        });
-    },
-    getLevels: function() {
-        return Object.keys(this._layers);
-    },
-    getLevel: function() {
-        return this._level;
-    },
-    setLevel: function(level) {
-        if (typeof(level) === 'object') {
-            level = level.newLevel;
-        }
-
-        if (this._level === level)
-            return;
-
-        var oldLayer = this._layers[this._level];
-        var layer = this._layers[level];
-
-        if (this._map !== null) {
-            this._map.removeLayer(oldLayer);
-            this._map.addLayer(layer);
-        }
-
-        this._level = level;
-    }
-});
-
-L.indoorLayer = function(data, options) {
-    return new L.IndoorLayer(data, options);
-};
-
 L.SelectiveVisibilityLayer = L.Class.extend({
     _layers: {},
 
@@ -1901,7 +1691,7 @@ L.SelectiveVisibilityLayer = L.Class.extend({
 });
 
 L.SelectiveVisibilityLayer = function(data, options) {
-    return new L.IndoorLayer(data, options);
+    return new L.Indoor(data, options);
 };
 // forEach compatability
 if (!Array.prototype.forEach) {

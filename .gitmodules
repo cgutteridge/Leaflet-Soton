@@ -16,3 +16,6 @@
 [submodule "resources/leaflet-hash"]
 	path = resources/leaflet-hash
 	url = https://github.com/mlevans/leaflet-hash.git
+[submodule "resources/leaflet-indoor"]
+	path = resources/leaflet-indoor
+	url = git@github.com:cbaines/leaflet-indoor.git
