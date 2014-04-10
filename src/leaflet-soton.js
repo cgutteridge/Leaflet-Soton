@@ -811,13 +811,13 @@ SELECT * WHERE {\
 
             var tabs = [
                 {
-                    id: 'features',
-                    name: 'Features',
+                    id: 'contents',
+                    name: 'Contents',
                     active: true
                 },
                 {
-                    id: 'contents',
-                    name: 'Contents',
+                    id: 'features',
+                    name: 'Features',
                 },
                 {
                     id: 'bookings',
@@ -832,7 +832,7 @@ SELECT * WHERE {\
 
             if ('contents' in properties) {
                 properties.contents.forEach(function(feature) {
-                    createBlankLink(feature.feature, feature.label, tabs.features);
+                    createBlankLink(feature.feature, feature.label, tabs.contents);
 
                     if (feature.subject === "http://id.southampton.ac.uk/point-of-interest-category/iSolutions-Workstations") {
                         var content = '<a href="' + feature.feature + '">' + feature.label + '</a>';
@@ -848,9 +848,66 @@ SELECT * WHERE {\
                 });
             }
 
+            if ('features' in properties) {
+                var featureList = document.createElement("ul");
+
+                properties.features.forEach(function(feature) {
+                    var featureLi = document.createElement("li");
+
+                    createBlankLink(feature.feature, feature.label, featureLi);
+
+                    featureList.appendChild(featureLi);
+                });
+
+                tabs.features.appendChild(featureList);
+            }
+
             if ('images' in properties) {
                 properties.images.forEach(function(image) {
 
+                    var versions = image.versions;
+                    var url,
+                        imageWidth,
+                        imageHeight;
+
+                    for (var i=0; i<versions.length; i++) {
+                        var version = versions[i];
+                        url = version.url;
+
+                        imageWidth = version.width;
+                        imageHeight = version.height;
+
+                        var mapContainer = map.getContainer();
+                        var widthBound = mapContainer.offsetWidth;
+                        var heightBound = mapContainer.offsetHeight;
+
+                        if (!smallScreen()) {
+                            widthBound *= 0.7;
+                            heightBound *= 0.7;
+                        }
+
+                        if (imageWidth < widthBound &&
+                            imageHeight < heightBound) {
+                            break; // Use this image, as it is the first smaller
+                                   // than the screen width
+                        }
+                    }
+
+                    if (url !== null) {
+                        // Link to the biggest image (versions is sorted by size on the server)
+                        var imageLink = createBlankLink(versions[0].url, false, tabs.pictures);
+
+                        var image = document.createElement('img');
+                        image.setAttribute('src', url);
+                        image.setAttribute('width', imageWidth);
+                        image.setAttribute('height', imageHeight);
+
+                        imageLink.appendChild(image);
+
+                        //createBlankLink(properties.images[0].licence, "Licence", tabs.picture);
+                    } else {
+                        tabs.picture.textContent = "No Image Available";
+                    }
                 });
             }
         });
