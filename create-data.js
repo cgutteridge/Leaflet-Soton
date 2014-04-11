@@ -281,6 +281,16 @@ function createRooms(buildings, workstations, callback) {
 
                             if ("uri" in part.properties) {
                                 buildingPartsByURI[part.properties.uri] = part;
+
+                                var expectedRef = part.properties.uri.split("/").slice(-1)[0].split("-")[1];
+
+                                if ("ref" in part.properties) {
+                                    if (part.properties.ref !== expectedRef) {
+                                        console.warn("Unexpected ref \"" + part.properties.ref + "\" for room " + part.properties.uri);
+                                    }
+                                } else {
+                                    console.warn("Missing ref \"" + expectedRef + "\" for room " + part.properties.uri);
+                                }
                             }
 
                             async.parallel([
