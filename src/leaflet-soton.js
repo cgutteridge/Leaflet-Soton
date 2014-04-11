@@ -91,6 +91,32 @@
 
             return null;
         },
+        getVendingMachinesLayer: function() {
+            var features = [];
+
+            this.data.buildingFeatures.features.forEach(function(feature) {
+                if ("vending" in feature.properties) {
+                    features.push(feature);
+                }
+            });
+
+            var layer = new L.GeoJSON(features, {
+                pointToLayer: vendingPointToLayer,
+                onEachFeature: function(feature, layer) {
+                    layer.on('click', function(e) {
+                        var popupOptions = {
+                            offset: icons.vendingHotDrinks.options.popupAnchor
+                        };
+
+                        var content = vendingPopupTemplate(feature.properties);
+
+                        showPopup(map, content, e.latlng, popupOptions);
+                    });
+                }
+            });
+
+            return layer;
+        },
         _updateWorkstationData: function() {
             var query;
 
@@ -562,21 +588,11 @@ SELECT * WHERE {\
                                 });
                             },
                             pointToLayer: function (feature, latlng) {
-                                var icon;
-
                                 if ('vending' in feature.properties) {
-                                    if (feature.properties.vending === 'drinks') {
-                                        icon = icons.vendingHotDrinks;
-                                    } else if (feature.properties.vending === 'sweets') {
-                                        icon = icons.vendingSweets;
-                                    } else {
-                                        console.warn("Unrecognired vending " + feature.properties.vending);
-                                    }
+                                    return vendingPointToLayer(feature, latlng);
                                 } else {
-                                    icon = icons.printer;
+                                    return L.marker(latlng, {icon: icons.printer});
                                 }
-
-                                return L.marker(latlng, {icon: icon});
                             }
                         });
 
@@ -742,6 +758,20 @@ SELECT * WHERE {\
     LS.map = function (id, options) {
         return new LS.Map(id, options);
     };
+
+    function vendingPointToLayer(feature, latlng) {
+        var icon;
+
+        if (feature.properties.vending === 'drinks') {
+            icon = icons.vendingHotDrinks;
+        } else if (feature.properties.vending === 'sweets') {
+            icon = icons.vendingSweets;
+        } else {
+            console.warn("Unrecognired vending " + feature.properties.vending);
+        }
+
+        return L.marker(latlng, {icon: icon});
+    }
 
     function showPopup(map, content, latlng, popupOptions) {
         popupOptions = popupOptions || {};
