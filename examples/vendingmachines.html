@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Vending Machines</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <link rel="stylesheet" href="../src/leaflet-soton.css" />
+
+    <link rel="stylesheet" href="../resources/leaflet/dist/leaflet.css" />
+
+    <style>
+        body {
+          padding: 0;
+          margin: 0;
+        }
+
+        html, body, #map {
+          height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script src="../resources/leaflet/dist/leaflet.js"></script>
+    <script src="../resources/leaflet-markercluster/dist/leaflet.markercluster.js"></script>
+    <script src="../resources/leaflet-indoor/leaflet-indoor.js"></script>
+
+    <script src="../src/leaflet-soton.js"></script>
+
+    <script type="text/javascript">
+        LS.imagePath = '../resources/images/';
+        LS.dataPath = '../data.json';
+
+        var map = LS.map('map', {
+            indoor: false,
+        });
+
+        LS.getData(function(data) {
+            var layer = LS.getVendingMachinesLayer();
+            layer.addTo(map);
+        });
+    </script>
+</body>
+</html>
