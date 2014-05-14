@@ -1305,7 +1305,7 @@ SELECT * WHERE {\
             content.appendChild(routeList);
 
             var IFrame = document.createElement('iframe');
-            IFrame.setAttribute('src', 'http://bus.southampton.ac.uk/bus-stop-iframe/' + properties.uri.slice(42)  + ".html")
+            IFrame.setAttribute('src', 'http://bus.southampton.ac.uk/bus-stop-iframe/' + properties.uri.slice(37)  + ".html")
             IFrame.setAttribute('frameBorder', '0');
             IFrame.setAttribute('style', 'width: 100%; height 100%;');
 
