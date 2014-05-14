@@ -19,3 +19,6 @@
 [submodule "resources/leaflet-indoor"]
 	path = resources/leaflet-indoor
 	url = https://github.com/cbaines/leaflet-indoor.git
+[submodule "resources/hartley-library-map-data"]
+	path = resources/hartley-library-map-data
+	url = git@sourcekettle.ecs.soton.ac.uk:projects/hartley-library-map-data.git
