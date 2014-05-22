@@ -291,18 +291,22 @@ function createRooms(buildings, workstations, callback) {
                                 } else {
                                     console.warn("Missing ref \"" + expectedRef + "\" for room " + part.properties.uri);
                                 }
-                            }
 
-                            async.parallel([
-                                function(callback) {
-                                    findRoomFeatures(part, callback);
-                                },
-                                function(callback) {
-                                    findRoomContents(part, workstations, callback);
-                                },
-                                function(callback) {
-                                    findRoomImages(part, callback);
-                                }], callback);
+                                async.parallel([
+                                    function(callback) {
+                                        findRoomFeatures(part, callback);
+                                    },
+                                    function(callback) {
+                                        findRoomContents(part, workstations, callback);
+                                    },
+                                    function(callback) {
+                                        findRoomImages(part, callback);
+                                    }],
+                                callback);
+                            } else {
+                                console.warn("room has no URI\n" + JSON.stringify(part));
+                                callback();
+                            }
                         } else {
                             callback();
                         }
@@ -374,7 +378,7 @@ function createRooms(buildings, workstations, callback) {
                               rdfs:label ?label ;\
                               spacerel:within ?building .\
                         }\
-                    } GROUP BY ?room";
+                    }";
 
                     sparqlQuery(query, function(err, data) {
                         if (err) {
@@ -383,6 +387,14 @@ function createRooms(buildings, workstations, callback) {
                         }
 
                         async.each(data.results.bindings, function(result, callback) {
+                            if ('error-message' in result) {
+                                console.error("error in createRooms");
+                                console.error(result);
+                                console.error("query " + query);
+                                callback(result);
+                                return;
+                            }
+
                             var uri = result.room.value;
                             var type = result.type.value;
                             var label = result.label.value;
@@ -561,11 +573,11 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
 PREFIX dct: <http://purl.org/dc/terms/>\
 PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>\
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
-SELECT ?roomFeature ?subject ?label WHERE {\
+SELECT * WHERE {\
 ?roomFeature spacerel:within <{{uri}}> ;\
      rdfs:label ?label ;\
      dct:subject ?subject ;\
-} GROUP BY ?roomFeature".template({ uri: room.properties.uri });
+}".template({ uri: room.properties.uri });
 
     sparqlQuery(query, function(err, data) {
         if (err) {
@@ -578,8 +590,23 @@ SELECT ?roomFeature ?subject ?label WHERE {\
         //console.log("features: " + JSON.stringify(data, null, 4));
 
         room.properties.contents = [];
-        async.each(data.results.bindings, function(feature, callback) {
+
+        featureDuplicateCheck = {};
+
+        data.results.bindings.forEach(function(feature) {
+            if ('error-message' in feature) {
+                console.error("error in findRoomContents");
+                console.error(JSON.stringify(feature));
+                return;
+            }
+
+            if (feature.roomFeature.value in featureDuplicateCheck) {
+                return;
+            }
+
             room.properties.contents.push({feature: feature.roomFeature.value, subject: feature.subject.value, label: feature.label.value});
+
+            featureDuplicateCheck[feature.roomFeature.value] = true;
 
             if (feature.subject.value === "http://id.southampton.ac.uk/point-of-interest-category/iSolutions-Workstations") {
                 workstations[feature.roomFeature.value] = {
@@ -595,9 +622,9 @@ SELECT ?roomFeature ?subject ?label WHERE {\
                     }
                 };
             }
+        });
 
-            callback();
-        }, callback);
+        callback();
     });
 }
 
@@ -614,15 +641,27 @@ SELECT ?feature ?label WHERE {\
 
     sparqlQuery(query, function(err, data) {
         if (err) {
-            console.error("Query " + query);
+            console.error("error in findRoomFeatures");
+            console.error("query " + query);
             console.error(err);
         }
 
         room.properties.features = [];
-        async.each(data.results.bindings, function(feature, callback) {
-            room.properties.features.push({feature: feature.feature.value, label: feature.label.value});
-            callback();
-        }, callback);
+        data.results.bindings.forEach(function(feature) {
+            if ('error-message' in feature) {
+                console.error("error in findRoomFeatures");
+                console.error(JSON.stringify(feature));
+                console.error("query:\n" + query);
+                return;
+            }
+
+            room.properties.features.push({
+                feature: feature.feature.value,
+                label: feature.label.value
+            });
+        });
+
+        callback();
     });
 }
 
@@ -644,8 +683,9 @@ SELECT * WHERE {\
 
     sparqlQuery(query, function(err, data) {
         if (err) {
-            console.error("Query " + query);
+            console.error("error in getUniWorkstations");
             console.error(err);
+            console.error("query " + query);
         }
 
         var results = data.results.bindings;
@@ -659,7 +699,8 @@ SELECT * WHERE {\
 
                 getBuildingCenter(building, function(err, center) {
                     if (err) {
-                        console.error("workstation err " + err);
+                        console.error("error in getUniWorkstations");
+                        console.error(err);
                         callback();
                         return;
                     }
@@ -709,12 +750,13 @@ SELECT * WHERE {\
       ?mdf <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/within> ?room .\
       ?room rdf:type ns1:Room\
     }\
-} group by ?mdf";
+}";
 
     sparqlQuery(query, function(err, data) {
         if (err) {
-            console.error("Query " + query);
+            console.error("error in getPrinters");
             console.error(err);
+            console.error("query " + query);
         }
 
         var printerLabelByURI = {};
@@ -723,6 +765,13 @@ SELECT * WHERE {\
         var openDataPrinterURIs = {}
 
         async.map(data.results.bindings, function(result, callback) {
+            if ('error-message' in result) {
+                console.error("error in getPrinters");
+                console.error(result);
+                console.error("query " + query);
+                callback();
+                return;
+            }
 
             var uri = result.mdf.value;
 
@@ -778,7 +827,7 @@ SELECT * WHERE {\
 
             Object.keys(printers).forEach(function(uri) {
                 if (!(uri in openDataPrinterURIs)) {
-                    console.err("printer " + uri + " is not known");
+                    console.error("error printer " + uri + " is not known");
                 } else {
                     printersWithLocations++;
                 }
@@ -1294,6 +1343,7 @@ OPTIONAL { ?image dcterms:license ?license ; }\
 
     sparqlQuery(imageQuery, function(err, data) {
         if (err) {
+            console.error("error in getImagesFor");
             console.error(err);
             callback(err);
             return;
@@ -1302,6 +1352,14 @@ OPTIONAL { ?image dcterms:license ?license ; }\
         var imageGroups = {};
 
         async.each(data.results.bindings, function(image, callback) {
+            if ('error-message' in image) {
+                console.error("error in getImagesFor");
+                console.error(JSON.stringify(image));
+                console.log("query: \n" + imageQuery);
+                callback(image);
+                return;
+            }
+
             var obj = {};
             obj.url = image.image.value;
             obj.width = image.width.value;
@@ -1324,6 +1382,11 @@ OPTIONAL { ?image dcterms:license ?license ; }\
 
             callback(null, obj);
         }, function(err) {
+            if (err) {
+                callback(err);
+                return;
+            }
+
             var images = [];
 
             for (var key in imageGroups) {
