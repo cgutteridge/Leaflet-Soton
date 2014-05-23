@@ -22,3 +22,6 @@
 [submodule "resources/hartley-library-map-data"]
 	path = resources/hartley-library-map-data
 	url = git@sourcekettle.ecs.soton.ac.uk:projects/hartley-library-map-data.git
+[submodule "resources/leaflet-heat"]
+	path = resources/leaflet-heat
+	url = https://github.com/Leaflet/Leaflet.heat.git
