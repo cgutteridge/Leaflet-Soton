@@ -315,7 +315,7 @@ SELECT * WHERE {\
     var emptyFeatureCollection = { type: "FeatureCollection", features: [] };
     var transparaentStyle = function(feature) {return {weight: 0, opacity: 0, fillOpacity: 0};};
 
-    var layerNames = ['sites', 'parking', 'bicycleParking', 'buildings', 'busStops' /*'busRoutes',*/];
+    var layerNames = ['sites', 'parking', 'bicycleParking', 'buildings', 'busStops', 'busRoutes'];
 
     var busRouteStyle = function(feature) {
         return {weight: 5, opacity: 0.5, color: feature.properties.colour};
@@ -354,10 +354,6 @@ SELECT * WHERE {\
                 options.highlight = {};
             }
 
-            var overlayMaps = {
-               //"Bus Routes": self.layers.busRoutes,
-            };
-
             if ("Hash" in L) {
                 var hash;
                 if (this.options.indoor) {
@@ -384,7 +380,7 @@ SELECT * WHERE {\
 
                             return {weight: 5, opacity: 0.5, color: 'blue'};
                         } else if (layerName === "busRoutes") {
-                            return busRouteStyle();
+                            return busRouteStyle(feature);
                         } else {
                             return blankStyle();
                         }
@@ -897,7 +893,8 @@ SELECT * WHERE {\
         buildings: buildingTemplate,
         bicycleParking: bicycleParkingTemplate,
         parking: parkingTemplate,
-        busStops: busStopTemplate
+        busStops: busStopTemplate,
+        busRoutes: busRouteTemplate
     };
 
     function roomPopupTemplate(properties) {

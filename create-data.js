@@ -960,6 +960,11 @@ function loadBusData(collections, callback) {
         function(routeMasters, callback) {
             var stopAreaRoutes = {} // Mapping from id to stop area, also contains the route names for that stop area
 
+            collections.busRoutes = {
+                type: "FeatureCollection",
+                features: []
+            };
+
             async.each(routeMasters, function(routeMaster, callback) {
                 async.each(routeMaster.members, function(member, callback) {
                     getRelation(member.ref, function(err, route) {
@@ -1000,10 +1005,22 @@ function loadBusData(collections, callback) {
                                     });
                                 }
 
-                                var flattenedCoords = [];
-                                flattenedCoords = flattenedCoords.concat.apply(flattenedCoords, routeCoords);
-
                                 var colour = ('colour' in route.tags) ? route.tags.colour : routeMaster.tags.colour;
+
+                                var busRoute = {
+                                    type: "Feature",
+                                    geometry: {
+                                        type: "LineString",
+                                        coordinates: routeCoords
+                                    },
+                                    properties: {
+                                        colour: colour,
+                                        name: route.tags.name,
+                                        ref: route.tags.ref
+                                    }
+                                }
+
+                                collections.busRoutes.features.push(busRoute);
 
                                 callback();
                             });
@@ -1030,6 +1047,9 @@ function loadBusData(collections, callback) {
 
 function createRouteGeometry(ways, callback) {
     var routeCoords = [];
+    var errors = [];
+
+    //console.log(JSON.stringify(ways.slice(2)), null, 4);
 
     function last(way) {
         return way.slice(-1)[0];
@@ -1043,26 +1063,31 @@ function createRouteGeometry(ways, callback) {
         return coord1[0] === coord2[0] && coord1[1] === coord2[1];
     }
 
-    // Determine the orientation of the first way
-    if (equal(last(ways[0]), first(ways[1])) || equal(last(ways[0]), last(ways[1]))) {
-        routeCoords = ways[0];
-    } else {
-        routeCords = ways[0].reverse();
+    // If the first way end joins with the 2nd way start or end, leave it as is
+    if (!(equal(last(ways[0]), first(ways[1])) || equal(last(ways[0]), last(ways[1])))) {
+        ways[0].reverse();
+
+        // Check if this reversed starting way works
+        if (!(equal(last(ways[0]), first(ways[1])) || equal(last(ways[0]), last(ways[1])))) {
+            errors.push("cannot determine correct alignment of first way");
+        }
     }
 
-    var errors = [];
+    // Add a clone such that the pop in the following loop does not modify the
+    // original array
+    routeCoords = ways[0].slice(0);
 
     for (var i=1; i<ways.length; i++) {
         var way = ways[i];
 
         // pop the end node, as this will be present on the next way added
-        routeCords.pop();
+        routeCoords.pop();
 
         if (equal(last(ways[i-1]), first(way))) {
-            routeCords.push.apply(routeCords, way);
+            routeCoords.push.apply(routeCoords, way);
         } else {
             if (!equal(last(ways[i-1]), last(way))) {
-                errors.push("break detected at " + i);
+                errors.push("break detected at " + i + " " + last(ways[i-1]) + " " + last(way));
             }
             routeCoords.push.apply(routeCoords, way.reverse());
         }
