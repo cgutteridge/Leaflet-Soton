@@ -4,7 +4,7 @@
  * This does two things, combines University Open Data, and the data from the
  * osm2pgsql tables in the database to add more information back in to the
  * database for the tile renderer. It also produces the static json files used
- * by the web clients
+ * by the web clients.
  */
 
 var S = require('string');
@@ -17,7 +17,6 @@ var yaml = require('js-yaml');
 
 var config = require("./config.json");
 
-// Get document, or throw exception on error
 try {
     var printers = yaml.safeLoad(fs.readFileSync('./resources/mfd-location/data.yaml', 'utf8'));
 } catch (e) {
@@ -44,62 +43,63 @@ pgql.connect('tcp://' + config.user + ':' +
 
     pg = client;
 
-    async.series([
-        loadBusData, // TODO: At the moment this puts bus data in the database, that then gets pulled back out...
-        function(callback) {
-            createTables(function(err) {
-                createCollections(function(err, collections) {
+    async.waterfall([
+        // Creates the database tables that can be created with a simple query
+        createTables,
+        // Get the data from these tables
+        createCollections,
+        // Now the basic collections have been created, handle the more complicated
+        // ones:
+        //  - busStops
+        //  - busRoutes
+        //  - buildingParts
+        //  - buildingFeatures
+        //  - workstations
+        //
+        // Extracting the data for these is a bit harder than the simpler
+        // collections.
+        function(collections, callback) {
 
-                    async.parallel([
-                        function(callback) {
-                            var workstations = {};
+            // Create an object with the buildings in for easy lookup
+            var buildings = {};
 
-                            var buildings = {};
+            collections.buildings.features.forEach(function(building) {
+                if ("uri" in building.properties) {
+                    buildings[building.properties.uri] = building;
+                }
+            });
 
-                            collections.buildings.features.forEach(function(building) {
-                                if ("uri" in building.properties) {
-                                    buildings[building.properties.uri] = building;
-                                }
-                            });
+            createBuildingParts(buildings, function(err, buildingParts, workstations) {
 
-                            createRooms(buildings, workstations, function(err, buildingParts) {
+                collections.buildingParts = buildingParts;
 
-                                collections.buildingParts = buildingParts;
-
-                                async.parallel([
-                                    function(callback) {
-                                        getBuildingFeatures(buildings, function(err, buildingFeatures) {
-                                            collections.buildingFeatures = buildingFeatures;
-                                            callback(err);
-                                        });
-                                    },
-                                    function(callback) {
-                                        getUniWorkstations(workstations, function(err, workstations) {
-                                            collections.workstations = workstations;
-                                            callback(err);
-                                        });
-                                    }
-                                ], callback);
-                            });
-                        },
-                        function(callback) {
-                            getBuildingImages(collections.buildings, callback);
-                        }
-                    ], function(err) {
-                        if (err) console.error(err);
-
+                async.parallel([
+                    function(callback) {
+                        getBuildingFeatures(buildings, function(err, buildingFeatures) {
+                            collections.buildingFeatures = buildingFeatures;
+                            callback(err);
+                        });
+                    },
+                    function(callback) {
+                        getUniWorkstations(workstations, function(err, workstations) {
+                            collections.workstations = workstations;
+                            callback(err);
+                        });
+                    }
+                ], function(err) {
+                    getBuildingImages(buildings, function(err) {
                         callback(err, collections);
                     });
                 });
             });
-        }
-    ], function(err, results) {
+        },
+        loadBusData
+    ],
+    function(err, collections){
         if (err) {
             console.error(err);
             process.exit(1);
         }
-
-        var collections = results[1];
 
         console.log("ending database connection");
         pgql.end();
@@ -107,8 +107,7 @@ pgql.connect('tcp://' + config.user + ':' +
 
             Object.keys(validationByURI).sort().forEach(function(uri) {
                 if ("location" in validationByURI[uri].errors) {
-                    //console.log(uri + " " + validationByURI[uri].errors.location);
-                    console.log(uri + " location unknown");
+                    console.warn(uri + " location unknown");
                 }
             });
 
@@ -119,6 +118,52 @@ pgql.connect('tcp://' + config.user + ':' +
     });
 });
 
+// This code handles creating the basic collections, that is:
+//  - buildings
+//  - parking
+//  - bicycleParking
+//  - sites
+//  - busStops
+//
+// It is done this way, as this is the data that has to be loaded in to the
+// database for the renderer to work.
+
+function createTables(callback) {
+    var tableSelects = {
+        site: "select way,name,loc_ref,uri,amenity,landuse \
+                from planet_osm_polygon \
+                where operator='University of Southampton'",
+        building: 'select way,coalesce("addr:housename", name, \'\') as name,coalesce(height::int, "building:levels"::int * 10, 10) as height,loc_ref,leisure,uri, case when coalesce("addr:housename", name, \'\')=\'\' or "addr:housename"="addr:housenumber" then true else false end as minor from planet_osm_polygon where ST_Contains((select ST_Union(way) from uni_site), way) and building is not null order by z_order,way_area desc',
+        parking: 'select way,name,access,capacity,"capacity:disabled",fee from planet_osm_polygon where amenity=\'parking\' and ST_Contains((select ST_Union(way) from uni_site), way)',
+        bicycle_parking: "select way,capacity,bicycle_parking,covered from planet_osm_polygon where amenity='bicycle_parking' and ST_Contains((select ST_Union(way) from uni_site), way) union select way,capacity,bicycle_parking,covered from planet_osm_point where amenity='bicycle_parking' and ST_Contains((select ST_Union(way) from uni_site), way)"
+    };
+
+    // Create all the tables, these contain Universtiy relevant data that is
+    // both further queried, and used by sum-carto
+    async.eachSeries(Object.keys(tableSelects), function(table, callback) {
+        createTable(table, tableSelects[table], callback);
+    }, callback);
+}
+
+function createTable(name, query, callback) {
+    var tableName = tablePrefix + name;
+
+    console.log("creating table " + tableName);
+
+    pg.query("drop table if exists " + tableName, function(err, results) {
+        var fullQuery = "create table " + tableName + " as " + query;
+        pg.query(fullQuery, function(err, results) {
+            if (err) {
+                console.error("error creating table " + tableName);
+                console.error("query: " + fullQuery);
+            } else {
+                console.log("finished creating table " + tableName);
+            }
+            callback(err);
+        });
+    });
+}
+
 function createCollections(callback) {
     var collectionQueries = {
         buildings: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as \
@@ -127,9 +172,7 @@ function createCollections(callback) {
         parking: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,\
                  name,access,capacity,"capacity:disabled",fee from uni_parking',
         bicycleParking: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,capacity,bicycle_parking,covered from uni_bicycle_parking',
-        sites: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,name,loc_ref,uri from uni_site',
-        busStops: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,name,uri,routes from uni_bus_stop',
-        busRoutes: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,name,note,colour,ref from uni_bus_route'
+        sites: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,name,loc_ref,uri from uni_site'
     };
 
     var names = Object.keys(collectionQueries);
@@ -183,52 +226,12 @@ function createCollection(name, query, callback) {
                 feature.properties.center = center;
             }
 
-            /*if (name === "buildings") {
-                buildings[feature.properties.uri] = feature;
-            }*/
-
             callback(err, feature);
         }, callback);
     });
 }
 
-function createTables(callback) {
-    var tableSelects = {
-        site: "select way,name,loc_ref,uri,amenity,landuse \
-                from planet_osm_polygon \
-                where operator='University of Southampton'",
-        building: 'select way,coalesce("addr:housename", name, \'\') as name,coalesce(height::int, "building:levels"::int * 10, 10) as height,loc_ref,leisure,uri, case when coalesce("addr:housename", name, \'\')=\'\' or "addr:housename"="addr:housenumber" then true else false end as minor from planet_osm_polygon where ST_Contains((select ST_Union(way) from uni_site), way) and building is not null order by z_order,way_area desc',
-        parking: 'select way,name,access,capacity,"capacity:disabled",fee from planet_osm_polygon where amenity=\'parking\' and ST_Contains((select ST_Union(way) from uni_site), way)',
-        bicycle_parking: "select way,capacity,bicycle_parking,covered from planet_osm_polygon where amenity='bicycle_parking' and ST_Contains((select ST_Union(way) from uni_site), way) union select way,capacity,bicycle_parking,covered from planet_osm_point where amenity='bicycle_parking' and ST_Contains((select ST_Union(way) from uni_site), way)"
-    };
-
-    // Create all the tables, these contain Universtiy relevant data that is
-    // both further queried, and used by sum-carto
-    async.eachSeries(Object.keys(tableSelects), function(table, callback) {
-        createTable(table, tableSelects[table], callback);
-    }, callback);
-}
-
-function createTable(name, query, callback) {
-    var tableName = tablePrefix + name;
-
-    console.log("creating table " + tableName);
-
-    pg.query("drop table if exists " + tableName, function(err, results) {
-        var fullQuery = "create table " + tableName + " as " + query;
-        pg.query(fullQuery, function(err, results) {
-            if (err) {
-                console.error("error creating table " + tableName);
-                console.error("query: " + fullQuery);
-            } else {
-                console.log("finished creating table " + tableName);
-            }
-            callback(err);
-        });
-    });
-}
-
-// buildings
+// buildingFeatures
 
 function getBuildingFeatures(buildings, callback) {
     async.parallel([
@@ -242,7 +245,10 @@ function getBuildingFeatures(buildings, callback) {
         var features = []
         features = features.concat.apply(features, results);
 
-        var buildingFeatures = { type: "FeatureCollection", features: features };
+        var buildingFeatures = {
+            type: "FeatureCollection",
+            features: features
+        };
 
         callback(err, buildingFeatures);
     });
@@ -250,9 +256,9 @@ function getBuildingFeatures(buildings, callback) {
 
 function getBuildingImages(buildings, callback) {
     console.log("getting building images");
-    async.each(buildings.features, function(building, callback) {
-        getImagesFor(building.properties.uri, function(err, images) {
-            building.properties.images = images;
+    async.each(Object.keys(buildings), function(uri, callback) {
+        getImagesFor(uri, function(err, images) {
+            buildings[uri].properties.images = images;
             callback(err);
         });
     }, callback);
@@ -260,8 +266,10 @@ function getBuildingImages(buildings, callback) {
 
 // buildingParts
 
-function createRooms(buildings, workstations, callback) {
+function createBuildingParts(buildings, callback) {
     console.log("creating buildingParts collection");
+
+    var workstations = {};
 
     async.parallel([getBuildingParts, getBuildingRelations],
         function(err, results) {
@@ -276,7 +284,7 @@ function createRooms(buildings, workstations, callback) {
                         if (part.properties.buildingpart === "room") {
 
                             if ("ref" in part.properties && !("uri" in part.properties)) {
-                                console.warn("room missing URI " + JSON.stringify(part.properties));
+                                console.warn("room missing URI " + JSON.stringify(part.properties.center));
                             }
 
                             if ("uri" in part.properties) {
@@ -304,7 +312,7 @@ function createRooms(buildings, workstations, callback) {
                                     }],
                                 callback);
                             } else {
-                                console.warn("room has no URI\n" + JSON.stringify(part));
+                                console.warn("room has no URI " + JSON.stringify(part.properties.center));
                                 callback();
                             }
                         } else {
@@ -353,8 +361,7 @@ function createRooms(buildings, workstations, callback) {
                                         part.properties.level = part.properties.level[0];
                                     }
                                 } else {
-                                    console.log("unknown level");
-                                    console.log(JSON.stringify(part, null, 4));
+                                    console.warn("unknown level " + JSON.stringify(part.properties.center));
                                 }
                             }
                             callback();
@@ -382,13 +389,13 @@ function createRooms(buildings, workstations, callback) {
 
                     sparqlQuery(query, function(err, data) {
                         if (err) {
-                            console.log("Query " + query);
+                            console.error("Query " + query);
                             console.error(err);
                         }
 
                         async.each(data.results.bindings, function(result, callback) {
                             if ('error-message' in result) {
-                                console.error("error in createRooms");
+                                console.error("error in createBuildingParts");
                                 console.error(result);
                                 console.error("query " + query);
                                 callback(result);
@@ -460,7 +467,7 @@ function createRooms(buildings, workstations, callback) {
                                     console.warn("no level for " + JSON.stringify(feature, null, 4));
                                 }
                             } else {
-                                addBuildingMessage(building, "errors", "location", "unknown (createRooms)");
+                                addBuildingMessage(building, "errors", "location", "unknown (createBuildingParts)");
                             }
 
                             callback();
@@ -468,7 +475,7 @@ function createRooms(buildings, workstations, callback) {
                             callback(null, {
                                 type: "FeatureCollection",
                                 features: buildingParts
-                            });
+                            }, workstations);
                         });
                     }); // SPARQL Query
                 }
@@ -937,21 +944,10 @@ SELECT * WHERE {\
     });
 }
 
-// buses
+// busStops and busRoutes
 
-function loadBusData(callback) {
+function loadBusData(collections, callback) {
     async.waterfall([
-        function(callback) {
-            pg.query('drop table if exists uni_bus_route', function(err, results) {
-                callback(err);
-            });
-        },
-        function(callback) {
-            console.log("creating uni_bus_route");
-            pg.query('create table uni_bus_route ( way geometry, name text, note text, colour text, ref text)', function(err, results) {
-                callback(err);
-            });
-        },
         function(callback) {
             var query = "select id,parts,members,tags from planet_osm_rels where tags @> array['type', 'route_master', 'Uni-link']";
             pg.query(query, callback);
@@ -1000,7 +996,7 @@ function loadBusData(callback) {
                                 if (err) {
                                     console.error("geometry errors for route " + route.tags.name);
                                     err.forEach(function(error) {
-                                        console.log("    " + error);
+                                        console.error("    " + error);
                                     });
                                 }
 
@@ -1009,13 +1005,7 @@ function loadBusData(callback) {
 
                                 var colour = ('colour' in route.tags) ? route.tags.colour : routeMaster.tags.colour;
 
-                                var pgQuery = "insert into uni_bus_route values(ST_GeomFromText('LINESTRING(" + flattenedCoords.join(" ") + "'), ";
-                                pgQuery = pgQuery + "'" + [route.tags.name, "note", colour, route.tags.ref].join("', '") + "')";
-
                                 callback();
-                                /*pg.query(pgQuery, function(err, result) {
-                                    callback(err);
-                                });*/
                             });
                         });
                     });
@@ -1024,17 +1014,17 @@ function loadBusData(callback) {
                 callback(err, stopAreaRoutes);
             });
         },
-        function(stopAreaRoutes, callback) {
-            // Now the route processing has finished, the bus stops can be created
+        // Now the route processing has finished, the bus stops can be created
+        createBusStops
+    ], function(err, busStops) {
 
-            createBusStops(stopAreaRoutes, callback);
-        }
-    ], function(err) {
+        collections.busStops = busStops;
+
         console.log("finished loadBusData");
         if (err)
            console.error(err);
 
-        callback(err);
+        callback(err, collections);
     });
 }
 
@@ -1099,18 +1089,33 @@ function createBusStops(stopAreaRoutes, callback) {
         },
         function(callback) {
             getRelations(Object.keys(stopAreaRoutes), function(err, areas) {
+                var featureCollection = {
+                    type: "FeatureCollection",
+                    features: []
+                };
+
                 async.each(areas, function(area, callback) {
-                    createBusStop(area, stopAreaRoutes[area.id], callback);
-                }, callback);
+                    createBusStop(area, stopAreaRoutes[area.id], function(err, busStop) {
+                        if (err){
+                            console.warn(err);
+                        } else {
+                            featureCollection.features.push(busStop);
+                        }
+
+                        callback();
+                    });
+                }, function(err) {
+                    callback(err, featureCollection);
+                });
             });
         }
-    ], function(err) {
+    ], function(err, busStops) {
         if (err)
             console.error(err);
 
         console.log("finished createBusStops");
 
-        callback(err);
+        callback(err, busStops);
     });
 }
 
@@ -1146,14 +1151,23 @@ function createBusStop(stopArea, routes, callback) {
                                 console.error("Query: " + pgQuery);
                                 console.error(err);
                             }
-                            callback(err);
+
+                            callback(err, {
+                                type: "Feature",
+                                geometry: node.geometry,
+                                properties: {
+                                    name: name,
+                                    uri: uri,
+                                    routes: routes
+                                }
+                            });
                         });
                     });
 
                     break;
                 case "way":
 
-                    callback();
+                    callback("unable to handle ways");
 
                     break;
             }
@@ -1163,8 +1177,7 @@ function createBusStop(stopArea, routes, callback) {
     }
 
     if (ref === undefined) {
-        console.log("no platform for area " + stopArea.tags.name + " (" + stopArea.id + ")");
-        callback();
+        callback("no platform for area " + stopArea.tags.name + " (" + stopArea.id + ")");
         return;
     }
 }
@@ -1175,7 +1188,7 @@ function decomposeRoomURI(uri) {
     var parts = uri.split("/").slice(-1)[0].split("-");
 
     if (parts.length !== 2) {
-        console.log("cannot parse " + uri);
+        console.warn("cannot parse " + uri);
         return undefined;
     }
 
@@ -1197,7 +1210,7 @@ function processRelation(relation, callback) {
         else if (type === "n")
             type = "node";
         else
-            console.log("Unknown type " + type);
+            console.warn("Unknown type " + type);
         obj.members.push({ type: type, ref: ref, role: relation.members[i+1] });
     }
 
@@ -1355,7 +1368,7 @@ OPTIONAL { ?image dcterms:license ?license ; }\
             if ('error-message' in image) {
                 console.error("error in getImagesFor");
                 console.error(JSON.stringify(image));
-                console.log("query: \n" + imageQuery);
+                console.error("query: \n" + imageQuery);
                 callback(image);
                 return;
             }
