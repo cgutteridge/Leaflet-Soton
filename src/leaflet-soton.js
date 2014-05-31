@@ -962,6 +962,19 @@ SELECT * WHERE {\
                 tabs.features.appendChild(featureList);
             }
 
+            // TODO: Find a better way to match the rooms, also add the rooms
+            // on level 5.
+            var bookableLibraryRoomNames = ["1A", "1B", "1C", "2A", "2B", "2C",
+                                            "2D", "3A", "3B", "3C", "3D", "3E",
+                                            "3F"];
+            if ('name' in properties &&
+                bookableLibraryRoomNames.indexOf(properties.name) != -1) {
+
+                createBlankLink("http://libcal.soton.ac.uk/booking/hartleyrooms",
+                                "This room can be booked through the Library Room Booking system.",
+                                tabs.bookings);
+            }
+
             if ('images' in properties) {
                 properties.images.forEach(function(image) {
 
