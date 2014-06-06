@@ -1683,7 +1683,6 @@ SELECT * WHERE {\
                     stopLayers[feature.properties.uri] = layer;
 
                     if (options.stopOptions.onEachFeature) {
-                        console.log("stops");
                         options.stopOptions.onEachFeature(feature, layer);
                     }
                 },
