@@ -25,3 +25,6 @@
 [submodule "resources/leaflet-heat"]
 	path = resources/leaflet-heat
 	url = https://github.com/Leaflet/Leaflet.heat.git
+[submodule "resources/leaflet-textpath"]
+	path = resources/leaflet-textpath
+	url = https://github.com/makinacorpus/Leaflet.TextPath.git

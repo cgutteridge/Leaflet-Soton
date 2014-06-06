@@ -101,7 +101,7 @@ pgql.connect('tcp://' + config.user + ':' +
             process.exit(1);
         }
 
-        console.log("ending database connection");
+        console.info("ending database connection");
         pgql.end();
         writeDataFiles(collections, function() {
 
@@ -111,7 +111,7 @@ pgql.connect('tcp://' + config.user + ':' +
                 }
             });
 
-            console.log("complete");
+            console.info("complete");
 
             process.exit(0);
         });
@@ -148,7 +148,7 @@ function createTables(callback) {
 function createTable(name, query, callback) {
     var tableName = tablePrefix + name;
 
-    console.log("creating table " + tableName);
+    console.info("creating table " + tableName);
 
     pg.query("drop table if exists " + tableName, function(err, results) {
         var fullQuery = "create table " + tableName + " as " + query;
@@ -157,7 +157,7 @@ function createTable(name, query, callback) {
                 console.error("error creating table " + tableName);
                 console.error("query: " + fullQuery);
             } else {
-                console.log("finished creating table " + tableName);
+                console.info("finished creating table " + tableName);
             }
             callback(err);
         });
@@ -255,7 +255,7 @@ function getBuildingFeatures(buildings, callback) {
 }
 
 function getBuildingImages(buildings, callback) {
-    console.log("getting building images");
+    console.info("getting building images");
     async.each(Object.keys(buildings), function(uri, callback) {
         getImagesFor(uri, function(err, images) {
             buildings[uri].properties.images = images;
@@ -267,7 +267,7 @@ function getBuildingImages(buildings, callback) {
 // buildingParts
 
 function createBuildingParts(buildings, callback) {
-    console.log("creating buildingParts collection");
+    console.info("creating buildingParts collection");
 
     var workstations = {};
 
@@ -741,7 +741,7 @@ SELECT * WHERE {\
 // buildingFeatures
 
 function getPrinters(buildings, callback) {
-    console.log("begining create printers");
+    console.info("begining create printers");
 
     var query = "PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>\
 PREFIX soton: <http://id.southampton.ac.uk/ns/>\
@@ -840,7 +840,7 @@ SELECT * WHERE {\
                 }
             });
 
-            console.log("finished processing printers (" + printersWithLocations + "/" + Object.keys(openDataPrinterURIs).length + ")");
+            console.info("finished processing printers (" + printersWithLocations + "/" + Object.keys(openDataPrinterURIs).length + ")");
 
             async.filter(results,
                 function(printer, callback) {
@@ -855,7 +855,7 @@ SELECT * WHERE {\
 }
 
 function getVendingMachines(buildings, callback) {
-    console.log("begin getVendingMachines");
+    console.info("begin getVendingMachines");
 
     var query = "PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>\
 PREFIX soton: <http://id.southampton.ac.uk/ns/>\
@@ -946,7 +946,94 @@ SELECT * WHERE {\
 
 // busStops and busRoutes
 
+function processRoute(route, routeMaster, stopAreaRoutes, callback) {
+
+    var ways = [];
+    var stopRefs = [];
+
+    async.eachSeries(route.members, function(member /* either a stop_area, or a road */, callback) {
+        if (member.type === "relation") { // Then its a stop_area
+            // Add the stop to the list (stopAreas)
+            if (member.ref in stopAreaRoutes) {
+                if (stopAreaRoutes[member.ref].indexOf(route.tags.ref) < 0)
+                    stopAreaRoutes[member.ref].push(route.tags.ref);
+            } else {
+                stopAreaRoutes[member.ref] = [route.tags.ref];
+            }
+
+            stopRefs.push(member.ref);
+
+            callback();
+        } else {
+            var query = "select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as way from planet_osm_line where osm_id = " + member.ref;
+
+            pg.query(query, function(err, results) {
+                if (err) callback(err);
+
+                ways.push(JSON.parse(results.rows[0].way).coordinates);
+
+                callback();
+            });
+        }
+    }, function(err) {
+        // Now to create the route geometry
+
+        getRelations(stopRefs, function(err, areas) {
+
+            var stopURIs = areas.map(function(area) {
+                var uri = area.tags.uri;
+
+                if (uri.indexOf("http://transport.data.gov.uk/id/stop-point/") === 0) {
+                    uri = "http://id.southampton.ac.uk/bus-stop/" + uri.slice(43);
+                } else {
+                    console.warn("Unrecognised bus stop uri " + uri);
+                }
+
+                return uri;
+            });
+
+            createRouteGeometry(ways, function(err, routeCoords) {
+                if (err) {
+                    console.error("geometry errors for route " + route.tags.name);
+                    err.forEach(function(error) {
+                        console.error("    " + error);
+                    });
+                }
+
+                var busRoute = {
+                    type: "Feature",
+                    geometry: {
+                        type: "LineString",
+                        coordinates: routeCoords
+                    },
+                    properties: {
+                        name: route.tags.name,
+                        ref: route.tags.ref,
+                        stops: stopURIs
+                    }
+                }
+
+                if ('colour' in route.tags) {
+                    busRoute.properties.colour = route.tags.colour;
+                }
+
+                if (routeMaster !== null) {
+                    busRoute.properties.routeMaster = routeMaster.tags.ref;
+
+                    if (!('colour' in route.tags) && 'colour' in routeMaster.tags) {
+                        busRoute.properties.colour = routeMaster.tags.colour;
+                    }
+                }
+
+                callback(null, busRoute);
+            });
+        });
+    });
+}
+
 function loadBusData(collections, callback) {
+    var stopAreaRoutes = {} // Mapping from id to stop area, also contains the route names for that stop area
+
     async.waterfall([
         function(callback) {
             var query = "select id,parts,members,tags from planet_osm_rels where tags @> array['type', 'route_master', 'Uni-link']";
@@ -958,86 +1045,91 @@ function loadBusData(collections, callback) {
             }, callback);
         },
         function(routeMasters, callback) {
-            var stopAreaRoutes = {} // Mapping from id to stop area, also contains the route names for that stop area
-
             collections.busRoutes = {
                 type: "FeatureCollection",
                 features: []
             };
 
-            async.each(routeMasters, function(routeMaster, callback) {
-                async.each(routeMaster.members, function(member, callback) {
+            async.eachSeries(routeMasters, function(routeMaster, callback) {
+                async.eachSeries(routeMaster.members, function(member, callback) {
+
+                    // Pull in the route in the route master
                     getRelation(member.ref, function(err, route) {
                         if (err) callback(err);
 
-                        var ways = [];
-                        var stopAreasRoutes = {};
+                        processRoute(route, routeMaster, stopAreaRoutes, function(err, feature) {
+                            collections.busRoutes.features.push(feature);
 
-                        async.eachSeries(route.members, function(member /* either a stop_area, or a road */, callback) {
-                            if (member.type === "relation") { // Then its a stop_area
-                                // Add the stop to the list (stopAreas)
-                                if (member.ref in stopAreaRoutes) {
-                                    if (stopAreaRoutes[member.ref].indexOf(route.tags.ref) < 0)
-                                        stopAreaRoutes[member.ref].push(route.tags.ref);
-                                } else {
-                                    stopAreaRoutes[member.ref] = [route.tags.ref];
-                                }
-                                callback();
-                            } else {
-                                var query = "select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as way from planet_osm_line where osm_id = " + member.ref;
-
-                                pg.query(query, function(err, results) {
-                                    if (err) callback(err);
-
-                                    ways.push(JSON.parse(results.rows[0].way).coordinates);
-
-                                    callback();
-                                });
-                            }
-                        }, function(err) {
-                            // Now to create the route geometry
-
-                            createRouteGeometry(ways, function(err, routeCoords) {
-                                if (err) {
-                                    console.error("geometry errors for route " + route.tags.name);
-                                    err.forEach(function(error) {
-                                        console.error("    " + error);
-                                    });
-                                }
-
-                                var colour = ('colour' in route.tags) ? route.tags.colour : routeMaster.tags.colour;
-
-                                var busRoute = {
-                                    type: "Feature",
-                                    geometry: {
-                                        type: "LineString",
-                                        coordinates: routeCoords
-                                    },
-                                    properties: {
-                                        colour: colour,
-                                        name: route.tags.name,
-                                        ref: route.tags.ref
-                                    }
-                                }
-
-                                collections.busRoutes.features.push(busRoute);
-
-                                callback();
-                            });
+                            callback(err);
                         });
                     });
                 }, callback);
-            }, function(err) {
-                callback(err, stopAreaRoutes);
-            });
+            }, callback);
+        },
+        // Now look at the individual routes that are not in route masters
+        function(callback) {
+            var query = "select id,parts,members,tags from planet_osm_rels where tags @> array['type', 'route', 'Uni-link']";
+            pg.query(query, callback);
+        },
+        function(results, callback) {
+            async.map(results.rows, function(relation, callback) {
+                processRelation(relation, callback);
+            }, callback);
+        },
+        function(routes, callback) {
+            async.eachSeries(routes, function(route, callback) {
+                processRoute(route, null, stopAreaRoutes, function(err, feature) {
+                    collections.busRoutes.features.push(feature);
+
+                    callback(err);
+                });
+            }, callback);
         },
         // Now the route processing has finished, the bus stops can be created
-        createBusStops
+        function(callback) {
+            createBusStops(stopAreaRoutes, callback);
+        }
     ], function(err, busStops) {
 
         collections.busStops = busStops;
 
-        console.log("finished loadBusData");
+        // Now remove all but the longest U1C route...
+
+        var longestRoute = 0;
+        for (var i in collections.busRoutes.features) {
+            var route = collections.busRoutes.features[i];
+
+            if (route.properties.ref !== "U1C") {
+                continue;
+            }
+
+            var stops = route.properties.stops.length;
+            console.log(stops);
+            if (stops > longestRoute) {
+                longestRoute = stops;
+            }
+        }
+
+        console.log("longest route " + longestRoute);
+
+        i = collections.busRoutes.features.length;
+        while (i--) {
+            route = collections.busRoutes.features[i];
+
+            if (route.properties.ref !== "U1C") {
+                continue;
+            }
+
+            var stops = route.properties.stops.length;
+
+            if (stops !== longestRoute) {
+                console.log("removing " + i);
+
+                collections.busRoutes.features.splice(i, 1);
+            }
+        }
+
+        console.info("finished loadBusData");
         if (err)
            console.error(err);
 
@@ -1107,7 +1199,7 @@ function createBusStops(stopAreaRoutes, callback) {
             });
         },
         function(callback) {
-            console.log("creating uni_bus_stop");
+            console.info("creating uni_bus_stop");
             pg.query('create table uni_bus_stop ( way geometry, name text, uri text, routes text array);', function(err, results) {
                 callback(err);
             });
@@ -1138,7 +1230,7 @@ function createBusStops(stopAreaRoutes, callback) {
         if (err)
             console.error(err);
 
-        console.log("finished createBusStops");
+        console.info("finished createBusStops");
 
         callback(err, busStops);
     });
@@ -1149,23 +1241,27 @@ function createBusStop(stopArea, routes, callback) {
         var member = stopArea.members[i];
         if (member.role === "platform") {
             var ref =  member.ref;
+
+            var name = stopArea.tags.name;
+            if (name !== undefined) {
+                name = name.replace("'", "''");
+            } else {
+                name = '';
+            }
+
+            var routeArray = "{" + routes.join(", ") + "}";
+
+            var uri = stopArea.tags.uri;
+
+            if (uri.indexOf("http://transport.data.gov.uk/id/stop-point/") === 0) {
+                uri = "http://id.southampton.ac.uk/bus-stop/" + uri.slice(43);
+            } else {
+                console.warn("Unrecognised bus stop uri " + uri);
+            }
+
             switch (member.type) {
                 case "node":
                     getNode(ref, function(err, node) {
-                        var name = stopArea.tags.name;
-                        if (name !== undefined) {
-                            name = name.replace("'", "''");
-                        } else {
-                            name = '';
-                        }
-
-                        var routeArray = "{" + routes.join(", ") + "}";
-
-                        var uri = stopArea.tags.uri;
-
-                        if (uri.indexOf("http://transport.data.gov.uk/id/stop-point/") === 0) {
-                            uri = "http://id.southampton.ac.uk/bus-stop/" + uri.slice(43);
-                        }
 
                         var pgQuery = "insert into uni_bus_stop values(ST_SetSRID(ST_MakePoint("
                         pgQuery = pgQuery + node.geometry.coordinates[0] + ", " + node.geometry.coordinates[1];
@@ -1191,8 +1287,27 @@ function createBusStop(stopArea, routes, callback) {
 
                     break;
                 case "way":
+                    var query = "select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as way from planet_osm_polygon where osm_id = " + member.ref;
 
-                    callback("unable to handle ways");
+                    pg.query(query, function(err, results) {
+                        if (err) {
+                            console.error("Query: " + pgQuery);
+                            callback(err);
+                            return;
+                        }
+
+                        var feature = {
+                            type: "Feature",
+                            geometry: JSON.parse(results.rows[0].way),
+                            properties: {
+                                name: name,
+                                uri: uri,
+                                routes: routes
+                            }
+                        }
+
+                        callback(err, feature);
+                    });
 
                     break;
             }
@@ -1245,6 +1360,9 @@ function processRelation(relation, callback) {
 
     obj.id = parseInt(relation.id, 10);
 
+    // This seems to make things right, unsure why?
+    obj.members.reverse();
+
     callback(null, obj);
 }
 
@@ -1269,11 +1387,41 @@ function getRelations(ids, callback) {
 
         async.map(results.rows, function(relation, callback) {
            processRelation(relation, callback);
-        }, callback);
+        }, function(err, relations) {
+
+            var relsByID = {};
+
+            relations.forEach(function(relation) {
+                relsByID[relation.id] = relation;
+            });
+
+            var orderedRelations = ids.map(function(id) {
+                return relsByID[id];
+            });
+
+            callback(null, orderedRelations);
+        });
     });
 }
 
 function getBuildingCenter(uri, callback) {
+
+    var hardcodedBuildings = {
+        "http://id.southampton.ac.uk/building/9591": {
+            type: "Point",
+            coordinates: [-1.10957, 51.28056]
+        },
+        "http://id.southampton.ac.uk/building/9594": {
+            type: "Point",
+            coordinates: [-1.30083, 50.71109]
+        }
+    }
+
+    if (uri in hardcodedBuildings) {
+        callback(null, hardcodedBuildings[uri]);
+        return;
+    }
+
     var query = "select ST_AsGeoJSON(ST_Centroid(ST_Transform(way, 4326)), 10) as center from uni_building where uri='" + uri + "';";
 
     pg.query(query, function(err, results) {
@@ -1468,7 +1616,7 @@ function writeDataFiles(data, callback) {
 // Validation Functions
 
 function validateBuildingParts(buildingParts, callback) {
-    console.log("begining validating buildingparts");
+    console.info("begining validating buildingparts");
 
     async.each(Object.keys(uniRooms), function(room, callback) {
         var type = uniRooms[room].type;
@@ -1509,7 +1657,7 @@ SELECT * WHERE {\
 
             callback();
         }, function(err) {
-            console.log("finished validateBuildings");
+            console.info("finished validateBuildings");
             callback(err);
         });
     });
