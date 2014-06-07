@@ -453,7 +453,7 @@ SELECT * WHERE {\
                     layer.addData(data[layerName]);
                 }
 
-                var routeLayer = new LS.RouteLayer(data.busRoutes, data.busStops, {
+                var routeLayer = new LS.RouteLayer(options.busRoutes ? data.busRoutes : emptyFeatureCollection, data.busStops, {
                     routeOptions: {
                         onEachFeature: function(feature, layer) {
                             layer.on('click', function(e) {
@@ -462,7 +462,7 @@ SELECT * WHERE {\
                                 showPopup(map, content, e.latlng);
                             });
                         },
-                        style: options.busRoutes ? busRouteStyle : blankStyle
+                        style: busRouteStyle
                     },
                     stopOptions: {
                         onEachFeature: function(feature, layer) {
