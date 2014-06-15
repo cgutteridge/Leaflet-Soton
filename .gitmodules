@@ -9,7 +9,7 @@
 	url = https://github.com/Leaflet/Leaflet.markercluster.git
 [submodule "resources/mfd-location"]
 	path = resources/mfd-location
-	url = git@sourcekettle.ecs.soton.ac.uk:projects/mfd-location.git
+	url = git://git.cbaines.net/mfd-location.git
 [submodule "resources/leaflet-locatecontrol"]
 	path = resources/leaflet-locatecontrol
 	url = https://github.com/domoritz/leaflet-locatecontrol.git
