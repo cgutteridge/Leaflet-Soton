@@ -535,11 +535,23 @@ function createBuildingParts(buildings, callback) {
 
                     mergeUniversityDataWithBuildingParts(buildingParts, buildingPartsByURI, buildings, function(err) {
 
-                        console.log("finishing createBuildingParts");
-                        callback(err, {
-                            type: "FeatureCollection",
-                            features: buildingParts
-                        }, workstations);
+                        async.eachSeries(buildingParts, function(buildingPart, callback) {
+                            if (buildingPart.properties.buildingpart === "room") {
+                                getDoors(buildingPart, function(err, doors) {
+                                    console.log(JSON.stringify(doors, null, 4));
+                                    buildingParts.push.apply(buildingParts, doors);
+                                    callback();
+                                });
+                            } else {
+                                callback();
+                            }
+                        }, function(err) {
+                            console.log("finishing createBuildingParts");
+                            callback(err, {
+                                type: "FeatureCollection",
+                                features: buildingParts
+                            }, workstations);
+                        });
                     });
                 }
             );
@@ -559,6 +571,35 @@ function getBuildingPartMemberRefs(levelRelation, callback) {
     }
 
     callback(null, partRefs);
+}
+
+function getDoors(room, callback) {
+
+    var query = "select osm_id, ST_AsGeoJSON(ST_Transform(way, 4326), 10) as point from planet_osm_point where (select nodes from planet_osm_ways where id=" + room.id + ") @> ARRAY[osm_id];";
+
+    pg.query(query, function(err, results) {
+        if (err) {
+            console.error("Query: " + query);
+            console.error(err);
+            callback(err);
+            return;
+        }
+
+        console.log(JSON.stringify(results, null, 4));
+
+        async.map(results.rows, function(part, callback) {
+            var feature = {type: "Feature", id: part.osm_id};
+            console.log(JSON.stringify(part, null, 4));
+            feature.geometry = JSON.parse(part.point);
+
+            feature.properties = { level: room.properties.level };
+
+            console.log("got door");
+            console.log(JSON.stringify(feature, null, 4));
+
+            callback(null, feature);
+        }, callback);
+    });
 }
 
 function getBuildingParts(callback) {

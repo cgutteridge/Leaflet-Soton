@@ -501,6 +501,16 @@ SELECT * WHERE {\
                         map.indoorLayer = L.indoor(data.buildingParts.features, {
                             level: map._startLevel,
                             style: function(feature) {
+                                if (feature.geometry.type === "Point") {
+                                    // Assume that this is a door
+
+                                    return {
+                                        stroke: false,
+                                        fillColor: "#000000",
+                                        fillOpacity: 1
+                                    };
+                                }
+
                                 var fill = 'white';
                                 if (feature.properties.buildingpart === 'corridor') {
                                     fill = '#169EC6';
@@ -641,8 +651,13 @@ SELECT * WHERE {\
                             pointToLayer: function (feature, latlng) {
                                 if ('vending' in feature.properties) {
                                     return vendingPointToLayer(feature, latlng);
-                                } else {
+                                } else if ('uri' in feature.properties && feature.properties.uri.indexOf("http://id.southampton.ac.uk/mfd/") === 0) {
                                     return L.marker(latlng, {icon: icons.printer});
+                                } else {
+                                    return L.circleMarker(latlng, {
+                                        radius: 4,
+                                        clickable: false
+                                    });
                                 }
                             }
                         });
