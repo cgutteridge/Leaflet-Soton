@@ -266,220 +266,283 @@ function getBuildingImages(buildings, callback) {
 
 // buildingParts
 
+function processBuildingParts(buildingParts, callback) {
+    var buildingPartsByURI = {};
+    var workstations = {};
+
+    async.each(buildingParts, function(part, callback) {
+        if (part.properties.buildingpart === "room") {
+            if ("uri" in part.properties) {
+                buildingPartsByURI[part.properties.uri] = part;
+
+                var expectedRef = part.properties.uri.split("/").slice(-1)[0].split("-")[1];
+
+                if ("ref" in part.properties) {
+                    if (part.properties.ref !== expectedRef) {
+                        console.warn("Unexpected ref \"" + part.properties.ref + "\" for room " + part.properties.uri);
+                    }
+                } else {
+                    console.warn("Missing ref \"" + expectedRef + "\" for room " + part.properties.uri);
+                }
+
+                async.parallel([
+                    function(callback) {
+                        findRoomFeatures(part, callback);
+                    },
+                    function(callback) {
+                        findRoomContents(part, workstations, callback);
+                    },
+                    function(callback) {
+                        findRoomImages(part, callback);
+                    }],
+                callback);
+            } else {
+                console.warn("room has no URI " + JSON.stringify(part.properties.center));
+                callback();
+            }
+        } else {
+            callback();
+        }
+    }, function(err) {
+        // list such that it fits within async's pattern
+        callback(err, [buildingPartsByURI, workstations]);
+    });
+}
+
+function getPartToLevelMap(buildingRelations, callback) {
+    var levelRelations = [];
+
+    // Process level relations
+    async.each(buildingRelations, function(buildingRelation, callback) {
+        getLevelRelations(buildingRelation, function(err, newLevelRelations) {
+            levelRelations.push.apply(levelRelations, newLevelRelations);
+            callback();
+        });
+    }, function(err) {
+
+        osmIDToLevels = {};
+
+        async.each(levelRelations, function(level, callback) {
+            getBuildingPartMemberRefs(level, function(err, refs) {
+                for (var i=0; i<refs.length; i++) {
+                    var ref = refs[i];
+
+                    if (!(ref in osmIDToLevels)) {
+                        osmIDToLevels[ref] = [];
+                    }
+
+                    osmIDToLevels[refs[i]].push(parseInt(level.tags.level, 10));
+                }
+                callback();
+            });
+        }, function(err) {
+            callback(osmIDToLevels);
+        });
+    });
+}
+
+function mergeUniversityDataWithBuildingParts(buildingParts, buildingPartsByURI, buildings, callback) {
+
+    // This query might be better, but does not quite work (rooms are missing)
+    /*
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX ns1: <http://vocab.deri.ie/rooms#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>
+PREFIX soton: <http://id.southampton.ac.uk/ns/>
+SELECT ?room ?type ?label ?building WHERE {
+  ?room a ns1:Room .
+  OPTIONAL { ?room spacerel:within ?building } .
+  OPTIONAL { ?room rdfs:label ?label } .
+  OPTIONAL { ?room rdf:type ?type }
+}
+     */
+
+    // This seems to not pick up much...
+    var query = "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
+    PREFIX ns1: <http://vocab.deri.ie/rooms#>\
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
+    PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>\
+    PREFIX soton: <http://id.southampton.ac.uk/ns/>\
+    SELECT * WHERE {\
+        { ?room a ns1:Room ;\
+              rdf:type ?type ;\
+              rdfs:label ?label ;\
+              spacerel:within ?building .\
+        } UNION {\
+          ?room a soton:SyllabusLocation ;\
+              rdf:type ?type ;\
+              rdfs:label ?label ;\
+              spacerel:within ?building .\
+        }\
+    }";
+
+    sparqlQuery(query, function(err, data) {
+        if (err) {
+            console.error("Query " + query);
+            console.error(err);
+        }
+
+        console.log("Got building parts sparql query back");
+
+        /*if ('error-message' in result) {
+            console.error("error in createBuildingParts");
+            console.error(result);
+            console.error("query " + query);
+            callback(result);
+            return;
+        }*/
+
+        var rooms = {};
+
+        data.results.bindings.forEach(function(result) {
+            var uri = result.room.value;
+            var type = result.type.value;
+            var label = result.label.value;
+            var building = result.building.value;
+
+            if (uri in rooms) {
+                var room = rooms[uri];
+
+                if (room.types.indexOf(type) === -1) {
+                    room.types.push(type);
+                }
+            } else {
+                rooms[uri] = {
+                    types: [type],
+                    label: label,
+                    building: building
+                };
+            }
+        });
+
+        Object.keys(rooms).forEach(function(uri) {
+            var room = rooms[uri];
+
+            var feature;
+
+            if (uri in buildingPartsByURI) {
+                feature = buildingPartsByURI[uri];
+            } else {
+                feature = {
+                    type: "Feature",
+                    properties: {
+                        uri: uri
+                    }
+                };
+
+                var info = decomposeRoomURI(uri);
+
+                if (typeof(info) !== "undefined") {
+                    feature.properties.ref = info.room;
+                    feature.properties.level = info.level;
+                }
+
+                buildingParts.push(feature);
+            }
+
+            if (room.types.indexOf("http://id.southampton.ac.uk/ns/CentrallyBookableSyllabusLocation") !== -1) {
+                feature.properties.teaching = true;
+                feature.properties.bookable = true;
+            } else if (room.types.indexOf("http://id.southampton.ac.uk/ns/SyllabusLocation") !== -1) {
+                feature.properties.teaching = true;
+                feature.properties.bookable = false;
+            } else {
+                feature.properties.teaching = false;
+                feature.properties.bookable = false;
+            }
+
+            if (feature.properties.teaching && !("geometry" in feature)) {
+                addRoomMessage(uri, "errors", "location", "unknown (teaching)");
+            }
+
+            if (!("name" in feature.properties)) {
+                feature.properties.name = room.label;
+            }
+
+            if (room.building in buildings) {
+                var buildingProperties = buildings[room.building].properties;
+
+                if (!('rooms' in buildingProperties)) {
+                    buildingProperties.rooms = {};
+                }
+
+                if ("level" in feature.properties) {
+                    var level = feature.properties.level;
+
+                    if (!(level in buildingProperties.rooms)) {
+                        buildingProperties.rooms[level] = [];
+                    }
+
+                    buildingProperties.rooms[level].push(uri);
+                } else {
+                    console.warn("no level for " + JSON.stringify(feature, null, 4));
+                }
+            } else {
+                addBuildingMessage(building, "errors", "location", "unknown (createBuildingParts)");
+            }
+        });
+
+        callback();
+    });
+}
+
 function createBuildingParts(buildings, callback) {
     console.info("creating buildingParts collection");
 
-    var workstations = {};
-
+    // get the buildingParts and buildingRelations from the database
+    //  - buildingParts are the ways tagged with buildingpart
+    //  - buildingRelations are all the building relations
     async.parallel([getBuildingParts, getBuildingRelations],
         function(err, results) {
+
+            // The objects in this array are modified
             var buildingParts = results[0];
             var buildingRelations = results[1];
 
-            var buildingPartsByURI = {};
-
             async.parallel([
+                // for each room, find the features, contents and images
                 function(callback) {
-                    async.each(buildingParts, function(part, callback) {
-                        if (part.properties.buildingpart === "room") {
-
-                            if ("ref" in part.properties && !("uri" in part.properties)) {
-                                console.warn("room missing URI " + JSON.stringify(part.properties.center));
-                            }
-
-                            if ("uri" in part.properties) {
-                                buildingPartsByURI[part.properties.uri] = part;
-
-                                var expectedRef = part.properties.uri.split("/").slice(-1)[0].split("-")[1];
-
-                                if ("ref" in part.properties) {
-                                    if (part.properties.ref !== expectedRef) {
-                                        console.warn("Unexpected ref \"" + part.properties.ref + "\" for room " + part.properties.uri);
-                                    }
-                                } else {
-                                    console.warn("Missing ref \"" + expectedRef + "\" for room " + part.properties.uri);
-                                }
-
-                                async.parallel([
-                                    function(callback) {
-                                        findRoomFeatures(part, callback);
-                                    },
-                                    function(callback) {
-                                        findRoomContents(part, workstations, callback);
-                                    },
-                                    function(callback) {
-                                        findRoomImages(part, callback);
-                                    }],
-                                callback);
-                            } else {
-                                console.warn("room has no URI " + JSON.stringify(part.properties.center));
-                                callback();
-                            }
-                        } else {
-                            callback();
-                        }
-                    }, callback);
+                    processBuildingParts(buildingParts, callback);
                 },
+                // determine the level for the building parts
                 function(callback) {
-                    var levelRelations = []
+                    getPartToLevelMap(buildingRelations, function(osmIDToLevels) {
 
-                    // Process level relations
-                    async.each(buildingRelations, function(buildingRelation, callback) {
-                        getLevelRelations(buildingRelation, function(err, newLevelRelations) {
-                            levelRelations.push.apply(levelRelations, newLevelRelations);
-                            callback();
-                        });
-                    }, function(err) {
+                        // Assign levels to parts
 
-                        osmIDToLevels = {};
+                        buildingParts.forEach(function(part) {
+                            if (part.id in osmIDToLevels) {
+                                part.properties.level = osmIDToLevels[part.id];
 
-                        async.each(levelRelations, function(level, callback) {
-                            getBuildingPartMemberRefs(level, function(err, refs) {
-                                for (var i=0; i<refs.length; i++) {
-                                    var ref = refs[i];
+                                part.properties.level.sort(function(a,b){return a-b});
 
-                                    if (!(ref in osmIDToLevels)) {
-                                        osmIDToLevels[ref] = [];
-                                    }
-
-                                    osmIDToLevels[refs[i]].push(parseInt(level.tags.level, 10));
+                                if (part.properties.level.length === 1) {
+                                    part.properties.level = part.properties.level[0];
                                 }
-                                callback();
-                            });
-                        }, function(err) {
-                            // Assign levels to parts
-
-                            for (var i=0; i<buildingParts.length; i++) {
-                                var part = buildingParts[i];
-
-                                if (part.id in osmIDToLevels) {
-                                    part.properties.level = osmIDToLevels[part.id];
-
-                                    part.properties.level.sort(function(a,b){return a-b});
-
-                                    if (part.properties.level.length === 1) {
-                                        part.properties.level = part.properties.level[0];
-                                    }
-                                } else {
-                                    console.warn("unknown level " + JSON.stringify(part.properties.center));
-                                }
+                            } else {
+                                console.warn("unknown level " + JSON.stringify(part.properties.center));
                             }
-                            callback();
                         });
+
+                        callback(err);
                     });
-                }], function(err) {
+                }], function(err, results) {
+                    var buildingPartsByURI = results[0][0];
+                    var workstations = results[0][1];
 
-                    var query = "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
-                    PREFIX ns1: <http://vocab.deri.ie/rooms#>\
-                    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
-                    PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>\
-                    PREFIX soton: <http://id.southampton.ac.uk/ns/>\
-                    SELECT * WHERE {\
-                        { ?room a ns1:Room ;\
-                              rdf:type ?type ;\
-                              rdfs:label ?label ;\
-                              spacerel:within ?building .\
-                        } UNION {\
-                          ?room a soton:SyllabusLocation ;\
-                              rdf:type ?type ;\
-                              rdfs:label ?label ;\
-                              spacerel:within ?building .\
-                        }\
-                    }";
+                    console.log("begining merge");
 
-                    sparqlQuery(query, function(err, data) {
-                        if (err) {
-                            console.error("Query " + query);
-                            console.error(err);
-                        }
+                    mergeUniversityDataWithBuildingParts(buildingParts, buildingPartsByURI, buildings, function(err) {
 
-                        async.each(data.results.bindings, function(result, callback) {
-                            if ('error-message' in result) {
-                                console.error("error in createBuildingParts");
-                                console.error(result);
-                                console.error("query " + query);
-                                callback(result);
-                                return;
-                            }
-
-                            var uri = result.room.value;
-                            var type = result.type.value;
-                            var label = result.label.value;
-                            var building = result.building.value;
-
-                            var feature;
-
-                            if (uri in buildingPartsByURI) {
-                                feature = buildingPartsByURI[uri];
-                            } else {
-                                feature = {
-                                    type: "Feature",
-                                    properties: {
-                                        uri: uri
-                                    }
-                                };
-
-                                var info = decomposeRoomURI(uri);
-
-                                if (typeof(info) !== "undefined") {
-                                    feature.properties.ref = info.room;
-                                    feature.properties.level = info.level;
-                                }
-
-                                buildingParts.push(feature);
-                            }
-
-                            if (type === "http://id.southampton.ac.uk/ns/CentrallyBookableSyllabusLocation") {
-                                feature.properties.teaching = true;
-                                feature.properties.bookable = true;
-                            } else if (type === "http://id.southampton.ac.uk/ns/SyllabusLocation") {
-                                feature.properties.teaching = true;
-                                feature.properties.bookable = false;
-                            } else {
-                                feature.properties.teaching = false;
-                                feature.properties.bookable = false;
-                            }
-
-                            if (feature.properties.teaching && !("geometry" in feature)) {
-                                addRoomMessage(uri, "errors", "location", "unknown (teaching)");
-                            }
-
-                            if (!("name" in feature.properties)) {
-                                feature.properties.name = label;
-                            }
-
-                            if (building in buildings) {
-                                var buildingProperties = buildings[building].properties;
-
-                                if (!('rooms' in buildingProperties)) {
-                                    buildingProperties.rooms = {};
-                                }
-
-                                if ("level" in feature.properties) {
-                                    var level = feature.properties.level;
-
-                                    if (!(level in buildingProperties.rooms)) {
-                                        buildingProperties.rooms[level] = [];
-                                    }
-
-                                    buildingProperties.rooms[level].push(uri);
-                                } else {
-                                    console.warn("no level for " + JSON.stringify(feature, null, 4));
-                                }
-                            } else {
-                                addBuildingMessage(building, "errors", "location", "unknown (createBuildingParts)");
-                            }
-
-                            callback();
-                        }, function(err) {
-                            callback(null, {
-                                type: "FeatureCollection",
-                                features: buildingParts
-                            }, workstations);
-                        });
-                    }); // SPARQL Query
+                        console.log("finishing createBuildingParts");
+                        callback(err, {
+                            type: "FeatureCollection",
+                            features: buildingParts
+                        }, workstations);
+                    });
                 }
-            ); // parallel
+            );
         }
     );
 }
