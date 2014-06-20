@@ -52,6 +52,7 @@ node,way   public_transport    text  polygon
 way        building:levels     text  polygon
 way        buildingpart text         polygon
 node       door         text         nocache,linear
+node       entrance     text         nocache,linear
 way        buildingpart:verticalpassage text polygon
 way        height       text         polygon
 node,way   bicycle_parking text      linear

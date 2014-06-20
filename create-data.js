@@ -493,12 +493,15 @@ function createBuildingParts(buildings, callback) {
     // get the buildingParts and buildingRelations from the database
     //  - buildingParts are the ways tagged with buildingpart
     //  - buildingRelations are all the building relations
-    async.parallel([getBuildingParts, getBuildingRelations],
+    async.parallel([getBuildingParts, getBuildingEntrances, getBuildingRelations],
         function(err, results) {
 
             // The objects in this array are modified
             var buildingParts = results[0];
-            var buildingRelations = results[1];
+            var buildingEntrances = results[1];
+            var buildingRelations = results[2];
+
+            buildingParts.push.apply(buildingParts, buildingEntrances);
 
             async.parallel([
                 // for each room, find the features, contents and images
@@ -521,7 +524,13 @@ function createBuildingParts(buildings, callback) {
                                     part.properties.level = part.properties.level[0];
                                 }
                             } else {
-                                console.warn("unknown level " + JSON.stringify(part.properties.center));
+                                var loc;
+                                if (part.geometry.type === "Point") {
+                                    loc = part.geometry.coordinates;
+                                } else {
+                                    loc = part.properties.center;
+                                }
+                                console.warn("unknown level " + JSON.stringify(loc));
                             }
                         });
 
@@ -538,7 +547,6 @@ function createBuildingParts(buildings, callback) {
                         async.eachSeries(buildingParts, function(buildingPart, callback) {
                             if (buildingPart.properties.buildingpart === "room") {
                                 getDoors(buildingPart, function(err, doors) {
-                                    console.log(JSON.stringify(doors, null, 4));
                                     buildingParts.push.apply(buildingParts, doors);
                                     callback();
                                 });
@@ -565,7 +573,9 @@ function getBuildingPartMemberRefs(levelRelation, callback) {
     for (var i=0; i<levelRelation.members.length; i++) {
         var member = levelRelation.members[i];
 
-        if (member.role === 'buildingpart') {
+        if (member.role === 'buildingpart' ||
+            member.role === 'entrance') {
+
             partRefs.push(member.ref);
         }
     }
@@ -585,17 +595,37 @@ function getDoors(room, callback) {
             return;
         }
 
-        console.log(JSON.stringify(results, null, 4));
-
         async.map(results.rows, function(part, callback) {
             var feature = {type: "Feature", id: part.osm_id};
-            console.log(JSON.stringify(part, null, 4));
             feature.geometry = JSON.parse(part.point);
 
             feature.properties = { level: room.properties.level };
 
-            console.log("got door");
-            console.log(JSON.stringify(feature, null, 4));
+            callback(null, feature);
+        }, callback);
+    });
+}
+
+function getBuildingEntrances(callback) {
+    var query = "select osm_id, ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon from planet_osm_point where ST_Contains((select ST_Union(way) from uni_site), way) and entrance is not null";
+
+    pg.query(query, function(err, results) {
+        if (err) {
+            console.error("Query: " + query);
+            console.error(err);
+            callback(err);
+            return;
+        }
+
+        async.map(results.rows, function(part, callback) {
+            var feature = {
+                type: "Feature",
+                id: part.osm_id,
+                properties: {
+                    buildingpart: "entrance"
+                }
+            };
+            feature.geometry = JSON.parse(part.polygon);
 
             callback(null, feature);
         }, callback);
