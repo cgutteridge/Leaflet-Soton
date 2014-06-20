@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env nodejs
 
 /*
  * This does two things, combines University Open Data, and the data from the
