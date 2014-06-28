@@ -309,35 +309,49 @@ function processBuildingParts(buildingParts, callback) {
     });
 }
 
-function getPartToLevelMap(buildingRelations, callback) {
-    var levelRelations = [];
+function getPartToLevelMap(buildingRelations, buildings, callback) {
+    var osmIDToLevels = {};
 
     // Process level relations
     async.each(buildingRelations, function(buildingRelation, callback) {
-        getLevelRelations(buildingRelation, function(err, newLevelRelations) {
-            levelRelations.push.apply(levelRelations, newLevelRelations);
+        getLevelRelations(buildingRelation, function(err, levelRelations) {
+            levelRelations.forEach(function(level) {
+
+                for (var i=0; i<level.members.length; i++) {
+                    var member = level.members[i];
+
+                    if (member.role === 'buildingpart' ||
+                        member.role === 'entrance') {
+
+                        var ref = member.ref;
+
+                        if (!(ref in osmIDToLevels)) {
+                            osmIDToLevels[ref] = [];
+                        }
+
+                        osmIDToLevels[ref].push(parseInt(level.tags.level, 10));
+
+                        if (member.role === 'entrance') {
+                            if ("uri" in buildingRelation.tags) {
+                                var uri = buildingRelation.tags.uri;
+
+                                var building = buildings[uri];
+                                var buildingProperties = building.properties;
+
+                                if (!("entrances" in buildingProperties)) {
+                                    buildingProperties.entrances = [];
+                                }
+
+                                buildingProperties.entrances.push(ref);
+                            }
+                        }
+                    }
+                }
+            });
             callback();
         });
     }, function(err) {
-
-        osmIDToLevels = {};
-
-        async.each(levelRelations, function(level, callback) {
-            getBuildingPartMemberRefs(level, function(err, refs) {
-                for (var i=0; i<refs.length; i++) {
-                    var ref = refs[i];
-
-                    if (!(ref in osmIDToLevels)) {
-                        osmIDToLevels[ref] = [];
-                    }
-
-                    osmIDToLevels[refs[i]].push(parseInt(level.tags.level, 10));
-                }
-                callback();
-            });
-        }, function(err) {
-            callback(osmIDToLevels);
-        });
+        callback(osmIDToLevels);
     });
 }
 
@@ -375,23 +389,15 @@ SELECT ?room ?type ?label ?building WHERE {
               rdfs:label ?label ;\
               spacerel:within ?building .\
         }\
-    }";
+    } limit 10";
 
     sparqlQuery(query, function(err, data) {
         if (err) {
-            console.error("Query " + query);
-            console.error(err);
+            callback(err);
+            return;
         }
 
         console.log("Got building parts sparql query back");
-
-        /*if ('error-message' in result) {
-            console.error("error in createBuildingParts");
-            console.error(result);
-            console.error("query " + query);
-            callback(result);
-            return;
-        }*/
 
         var rooms = {};
 
@@ -510,7 +516,7 @@ function createBuildingParts(buildings, callback) {
                 },
                 // determine the level for the building parts
                 function(callback) {
-                    getPartToLevelMap(buildingRelations, function(osmIDToLevels) {
+                    getPartToLevelMap(buildingRelations, buildings, function(osmIDToLevels) {
 
                         // Assign levels to parts
 
@@ -565,22 +571,6 @@ function createBuildingParts(buildings, callback) {
             );
         }
     );
-}
-
-function getBuildingPartMemberRefs(levelRelation, callback) {
-    var partRefs = []
-
-    for (var i=0; i<levelRelation.members.length; i++) {
-        var member = levelRelation.members[i];
-
-        if (member.role === 'buildingpart' ||
-            member.role === 'entrance') {
-
-            partRefs.push(member.ref);
-        }
-    }
-
-    callback(null, partRefs);
 }
 
 function getDoors(room, callback) {
@@ -1631,7 +1621,17 @@ function sparqlQuery(query, callback) {
             if (res.statusCode !== 200)
                 callback(data);
 
-            var obj = JSON.parse(data);
+            try {
+                var obj = JSON.parse(data);
+            } catch (err) {
+                console.error("Error parsing output from sparql.data.southampton.ac.uk");
+                console.error(data);
+
+                console.error(query);
+
+                callback(err);
+                return;
+            }
 
             callback(null, obj);
         })
