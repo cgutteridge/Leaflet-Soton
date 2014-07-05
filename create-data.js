@@ -17,6 +17,8 @@ var yaml = require('js-yaml');
 
 var config = require("./config.json");
 
+var library_data = require("./resources/hartley-library-map-data/data.json");
+
 try {
     var printers = yaml.safeLoad(fs.readFileSync('./resources/mfd-location/data.yaml', 'utf8'));
 } catch (e) {
@@ -88,7 +90,11 @@ pgql.connect('tcp://' + config.user + ':' +
                     }
                 ], function(err) {
                     getBuildingImages(buildings, function(err) {
-                        callback(err, collections);
+                        getLibraryData(library_data, function(err, features) {
+                            collections.buildingParts.features.push.apply(collections.buildingParts.features, features);
+
+                            callback(err, collections);
+                        });
                     });
                 });
             });
@@ -117,6 +123,7 @@ pgql.connect('tcp://' + config.user + ':' +
         });
     });
 });
+
 
 // This code handles creating the basic collections, that is:
 //  - buildings
@@ -491,6 +498,28 @@ SELECT ?room ?type ?label ?building WHERE {
 
         callback();
     });
+}
+
+function getLibraryData(library_data, callback) {
+    callback(null, library_data.features.map(function(feature) {
+        feature.properties.buildingpart = "room";
+        feature.properties.name = feature.properties.label;
+        delete feature.properties.label;
+
+        var points = feature.geometry.coordinates[0];
+
+        var lat = 0;
+        var lon = 0;
+
+        points.forEach(function(point) {
+            lat += point[0];
+            lon += point[1];
+        });
+
+        feature.properties.center = [lon / points.length, lat / points.length];
+
+        return feature;
+    }));
 }
 
 function createBuildingParts(buildings, callback) {

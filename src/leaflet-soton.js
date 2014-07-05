@@ -4,14 +4,11 @@
     var LS = window.LS = L.extend({}, L.Mixin.Events, {
 
         dataPath: 'data.json',
-        libraryDataPath: '../resources/hartley-library-map-data/data.json',
         imagePath: 'images/',
         data: null,
         _dataFetchInProgress: false,
         workstationData: null,
         _workstationDataFetchInProgress: false,
-        libraryData: null,
-        _libraryDataFetchInProgress: false,
 
         getData: function(callback) {
             if (this.data !== null) {
@@ -38,24 +35,6 @@
                 if (!this._workstationDataFetchInProgress) {
                     this._workstationDataFetchInProgress = true;
                     this._updateWorkstationData();
-                }
-            }
-        },
-        getLibraryData: function(callback) {
-            if (this.libraryData !== null) {
-                callback(this.libraryData);
-            } else {
-                this.addOneTimeEventListener("libraryData", callback);
-
-                if (!this._libraryDataFetchInProgress) {
-                    this._libraryDataFetchInProgress = true;
-
-                    getJSON({url: LS.libraryDataPath} , function(data) {
-                        LS.libraryData = data;
-                        LS._libraryDataFetchInProgress = false;
-
-                        LS.fire("libraryData", data);
-                    });
                 }
             }
         },
@@ -694,10 +673,6 @@ SELECT * WHERE {\
                                     map.removeLayer(map.indoorLayer);
                                 }
 
-                                if (map.hasLayer(map.libraryIndoorLayer)) {
-                                    map.removeLayer(map.libraryIndoorLayer);
-                                }
-
                                 if (options.workstations && !map.hasLayer(workstationMarkerLayer)) {
                                     map.addLayer(workstationMarkerLayer);
                                 }
@@ -711,66 +686,17 @@ SELECT * WHERE {\
                                     map.addLayer(map.indoorLayer);
                                 }
 
-                                if (!map.hasLayer(map.libraryIndoorLayer)) {
-                                    map.addLayer(map.libraryIndoorLayer);
-                                }
-
                                 if (options.workstations && map.hasLayer(workstationMarkerLayer)) {
                                     map.removeLayer(workstationMarkerLayer);
                                 }
                             }
                         };
 
-                        LS.getLibraryData(function(data) {
-
-                            map.libraryIndoorLayer = L.indoor(data.features, {
-                                level: map._startLevel,
-                                style: function(feature) {
-                                    return {
-                                        fillColor: 'white',
-                                        weight: 1,
-                                        color: '#666',
-                                        fillOpacity: 1
-                                    };
-                                },
-                                markerForFeature: function(part) {
-                                    var myIcon = L.divIcon({
-                                        className: 'ls-room-marker',
-                                        html: part.properties.label,
-                                        iconSize: new L.Point(100, 30),
-                                        iconAnchor: new L.Point(50, 15)
-                                    });
-
-                                    // TODO: Switch to a better method
-                                    var points = part.geometry.coordinates[0];
-
-                                    var lat = 0;
-                                    var lon = 0;
-
-                                    points.forEach(function(point) {
-                                        lat += point[0];
-                                        lon += point[1];
-                                    });
-
-                                    var coords = [lon / points.length, lat / points.length];
-
-                                    var marker = L.marker(coords, {icon: myIcon});
-
-                                    return marker;
-                                },
-                                onEachFeature: function(feature, layer) {
-                                    return;
-                                }
-                            });
-
-                            map.levelControl.addEventListener("levelchange", map.libraryIndoorLayer.setLevel, map.libraryIndoorLayer);
-
-                            setIndoorContent(map.getZoom());
-
-                            map.on('zoomend', function(e) {
-                                setIndoorContent(this.getZoom());
-                            });
+                        map.on('zoomend', function(e) {
+                            setIndoorContent(this.getZoom());
                         });
+
+                        setIndoorContent(map.getZoom());
                     } else {
                         if (options.workstations) {
                             map.addLayer(workstationMarkerLayer);
