@@ -18,7 +18,7 @@
 
                 if (!this._dataFetchInProgress) {
                     this._dataFetchInProgress = true;
-                    getJSON({url: LS.dataPath} , function(data) {
+                    getJSON({url: LS.dataPath, cache: false} , function(data) {
                         LS.data = data;
                         LS._dataFetchInProgress = false;
 
@@ -96,13 +96,7 @@
             return null;
         },
         getVendingMachinesLayer: function() {
-            var features = [];
-
-            this.data.buildingFeatures.features.forEach(function(feature) {
-                if ("vending" in feature.properties) {
-                    features.push(feature);
-                }
-            });
+            var features = this.data.vendingMachines.features;
 
             var layer = new L.GeoJSON(features, {
                 pointToLayer: vendingPointToLayer,
@@ -641,7 +635,8 @@ SELECT * WHERE {\
                             }
                         });
 
-                        map.indoorLayer.addData(data.buildingFeatures);
+                        map.indoorLayer.addData(data.vendingMachines);
+                        map.indoorLayer.addData(data.multiFunctionDevices);
 
                         map.levelControl = L.Control.level({
                             levels: map.indoorLayer.getLevels(),
@@ -1550,6 +1545,12 @@ SELECT * WHERE {\
         xhttp.timeout = 2000;
 
         options.data = options.data || null;
+
+        var url = options.url
+
+        if ("cache" in options && options.cache == false) {
+            url += "?" + new Date().getTime();
+        }
 
         xhttp.open('GET', options.url, true);
         xhttp.setRequestHeader('Accept', 'application/json');

@@ -55,7 +55,6 @@ pgql.connect('tcp://' + config.user + ':' +
         //  - busStops
         //  - busRoutes
         //  - buildingParts
-        //  - buildingFeatures
         //  - workstations
         //
         // Extracting the data for these is a bit harder than the simpler
@@ -77,14 +76,28 @@ pgql.connect('tcp://' + config.user + ':' +
 
                 async.parallel([
                     function(callback) {
-                        getBuildingFeatures(buildings, function(err, buildingFeatures) {
-                            collections.buildingFeatures = buildingFeatures;
-                            callback(err);
+                        getPrinters(buildings, function(err, features) {
+                            collections.multiFunctionDevices = {
+                              type: "FeatureCollection",
+                              features: features
+                            };
+
+                            callback();
+                        });
+                    },
+                    function(callback) {
+                        getVendingMachines(buildings, function(err, features) {
+                            collections.vendingMachines = {
+                              type: "FeatureCollection",
+                              features: features
+                            };
+                            callback();
                         });
                     },
                     function(callback) {
                         getUniWorkstations(workstations, function(err, workstations) {
                             collections.workstations = workstations;
+
                             callback(err);
                         });
                     }
@@ -235,29 +248,6 @@ function createCollection(name, query, callback) {
 
             callback(err, feature);
         }, callback);
-    });
-}
-
-// buildingFeatures
-
-function getBuildingFeatures(buildings, callback) {
-    async.parallel([
-        function(callback) {
-            getPrinters(buildings, callback);
-        },
-        function(callback) {
-            getVendingMachines(buildings, callback);
-        }
-    ], function(err, results) {
-        var features = []
-        features = features.concat.apply(features, results);
-
-        var buildingFeatures = {
-            type: "FeatureCollection",
-            features: features
-        };
-
-        callback(err, buildingFeatures);
     });
 }
 
@@ -890,8 +880,6 @@ SELECT * WHERE {\
         });
     });
 }
-
-// buildingFeatures
 
 function getPrinters(buildings, callback) {
     console.info("begining create printers");
