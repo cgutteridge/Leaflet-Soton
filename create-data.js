@@ -354,39 +354,17 @@ function getPartToLevelMap(buildingRelations, buildings, callback) {
 
 function mergeUniversityDataWithBuildingParts(buildingParts, buildingPartsByURI, buildings, callback) {
 
-    // This query might be better, but does not quite work (rooms are missing)
-    /*
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-PREFIX ns1: <http://vocab.deri.ie/rooms#>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>
-PREFIX soton: <http://id.southampton.ac.uk/ns/>
-SELECT ?room ?type ?label ?building WHERE {
-  ?room a ns1:Room .
-  OPTIONAL { ?room spacerel:within ?building } .
-  OPTIONAL { ?room rdfs:label ?label } .
-  OPTIONAL { ?room rdf:type ?type }
-}
-     */
-
-    // This seems to not pick up much...
     var query = "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
-    PREFIX ns1: <http://vocab.deri.ie/rooms#>\
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
-    PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>\
-    PREFIX soton: <http://id.southampton.ac.uk/ns/>\
-    SELECT * WHERE {\
-        { ?room a ns1:Room ;\
-              rdf:type ?type ;\
-              rdfs:label ?label ;\
-              spacerel:within ?building .\
-        } UNION {\
-          ?room a soton:SyllabusLocation ;\
-              rdf:type ?type ;\
-              rdfs:label ?label ;\
-              spacerel:within ?building .\
-        }\
-    } limit 10";
+PREFIX ns1: <http://vocab.deri.ie/rooms#>\
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
+PREFIX spacerel: <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/>\
+PREFIX soton: <http://id.southampton.ac.uk/ns/>\
+SELECT DISTINCT * WHERE {\
+  ?room a ns1:Room .\
+  OPTIONAL { ?room spacerel:within ?building } .\
+  OPTIONAL { ?room rdfs:label ?label } .\
+  OPTIONAL { ?room rdf:type ?type }\
+}";
 
     sparqlQuery(query, function(err, data) {
         if (err) {
@@ -395,27 +373,39 @@ SELECT ?room ?type ?label ?building WHERE {
         }
 
         console.log("Got building parts sparql query back");
+        console.log("got " + data.results.bindings.length + " things back");
 
         var rooms = {};
 
         data.results.bindings.forEach(function(result) {
             var uri = result.room.value;
-            var type = result.type.value;
-            var label = result.label.value;
-            var building = result.building.value;
 
             if (uri in rooms) {
                 var room = rooms[uri];
 
-                if (room.types.indexOf(type) === -1) {
-                    room.types.push(type);
+                if ("type" in result) {
+                    var type = result.type.value;
+                    if (room.types.indexOf(type) === -1) {
+                        room.types.push(type);
+                    }
                 }
             } else {
-                rooms[uri] = {
-                    types: [type],
-                    label: label,
-                    building: building
-                };
+                var room = rooms[uri] = {};
+
+                if ("building" in result) {
+                    var building = result.building.value;
+                    room.building = building;
+                }
+
+                if ("label" in result) {
+                    var label = result.label.value;
+                    room.label = label;
+                }
+
+                if ("type" in result) {
+                    var type = result.type.value;
+                    room.types = [ type ];
+                }
             }
         });
 
@@ -482,7 +472,7 @@ SELECT ?room ?type ?label ?building WHERE {
                     console.warn("no level for " + JSON.stringify(feature, null, 4));
                 }
             } else {
-                addBuildingMessage(building, "errors", "location", "unknown (createBuildingParts)");
+                addBuildingMessage(room.building, "errors", "location", "unknown (createBuildingParts)");
             }
         });
 
