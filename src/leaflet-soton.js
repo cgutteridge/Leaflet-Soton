@@ -764,7 +764,9 @@ SELECT * WHERE {\
                 var bounds = L.latLngBounds(coords);
                 this.fitBounds(bounds);
 
-                if ("level" in feature.properties) {
+                if (L.Util.isArray(feature.properties.level)) {
+                    this.setLevel(feature.properties.level[0]);
+                } else {
                     this.setLevel(feature.properties.level);
                 }
 
@@ -775,7 +777,11 @@ SELECT * WHERE {\
                 this.setView(L.GeoJSON.coordsToLatLng(feature.geometry.coordinates), 22);
 
                 if ("level" in feature.properties) {
-                    this.setLevel(feature.properties.level);
+                    if (L.Util.isArray(feature.properties.level)) {
+                        this.setLevel(feature.properties.level[0]);
+                    } else {
+                        this.setLevel(feature.properties.level);
+                    }
                 } else {
                     // If this is a workstation
                     if (uri.indexOf("http://id.southampton.ac.uk/point-of-service/workstations") === 0) {
