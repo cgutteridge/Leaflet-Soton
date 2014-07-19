@@ -297,7 +297,7 @@ function processBuildingParts(buildingParts, callback) {
                     }],
                 callback);
             } else {
-                console.warn("room has no URI " + JSON.stringify(part.properties.center));
+                console.warn("room has no URI " + linkToLoc(part.properties.center));
                 callback();
             }
         } else {
@@ -309,8 +309,15 @@ function processBuildingParts(buildingParts, callback) {
     });
 }
 
+function linkToLoc(loc, reverse) {
+    if (reverse)
+        loc = loc.slice(0).reverse();
+    return "http://cbaines.net/sum/#1/22/" + loc.join('/');
+}
+
 function getPartToLevelMap(buildingRelations, buildings, callback) {
     var osmIDToLevels = {};
+    var osmIDToBuilding = {};
 
     // Process level relations
     async.each(buildingRelations, function(buildingRelation, callback) {
@@ -324,6 +331,8 @@ function getPartToLevelMap(buildingRelations, buildings, callback) {
                         member.role === 'entrance') {
 
                         var ref = member.ref;
+
+                        osmIDToBuilding[ref] = buildingRelation.tags.uri;
 
                         if (!(ref in osmIDToLevels)) {
                             osmIDToLevels[ref] = [];
@@ -351,7 +360,7 @@ function getPartToLevelMap(buildingRelations, buildings, callback) {
             callback();
         });
     }, function(err) {
-        callback(osmIDToLevels);
+        callback(osmIDToLevels, osmIDToBuilding);
     });
 }
 
@@ -466,11 +475,17 @@ SELECT DISTINCT * WHERE {\
                 if ("level" in feature.properties) {
                     var level = feature.properties.level;
 
-                    if (!(level in buildingProperties.rooms)) {
-                        buildingProperties.rooms[level] = [];
+                    if (!(level instanceof Array)) {
+                        level = [ feature.properties.level ];
                     }
 
-                    buildingProperties.rooms[level].push(uri);
+                    level.forEach(function(l) {
+                        if (!(l in buildingProperties.rooms)) {
+                            buildingProperties.rooms[l] = [];
+                        }
+
+                        buildingProperties.rooms[l].push(uri);
+                    });
                 } else {
                     console.warn("no level for " + JSON.stringify(feature, null, 4));
                 }
@@ -487,6 +502,9 @@ function getLibraryData(library_data, callback) {
     callback(null, library_data.features.map(function(feature) {
         feature.properties.buildingpart = "room";
         feature.properties.name = feature.properties.label;
+
+        feature.properties.building = "http://id.southampton.ac.uk/building/36";
+
         delete feature.properties.label;
 
         var points = feature.geometry.coordinates[0];
@@ -528,7 +546,7 @@ function createBuildingParts(buildings, callback) {
                 },
                 // determine the level for the building parts
                 function(callback) {
-                    getPartToLevelMap(buildingRelations, buildings, function(osmIDToLevels) {
+                    getPartToLevelMap(buildingRelations, buildings, function(osmIDToLevels, osmIDToBuilding) {
 
                         // Assign levels to parts
 
@@ -543,12 +561,20 @@ function createBuildingParts(buildings, callback) {
                                 }
                             } else {
                                 var loc;
+                                var reverse;
                                 if (part.geometry.type === "Point") {
                                     loc = part.geometry.coordinates;
+                                    reverse = true;
                                 } else {
                                     loc = part.properties.center;
+                                    reverse = false;
                                 }
-                                console.warn("unknown level " + JSON.stringify(loc));
+                                console.warn("unknown level " + linkToLoc(loc, reverse));
+                                console.warn(JSON.stringify(part.properties, null, 4));
+                            }
+
+                            if (part.id in osmIDToBuilding) {
+                                part.properties.building = osmIDToBuilding[part.id];
                             }
                         });
 
@@ -562,16 +588,82 @@ function createBuildingParts(buildings, callback) {
 
                     mergeUniversityDataWithBuildingParts(buildingParts, buildingPartsByURI, buildings, function(err) {
 
+                        var doorsToRooms = {};
+                        var doorsById = {};
+
                         async.eachSeries(buildingParts, function(buildingPart, callback) {
-                            if (buildingPart.properties.buildingpart === "room") {
+                            var properties = buildingPart.properties;
+
+                            if (properties !== undefined && (
+                                    properties.buildingpart === "room" ||
+                                    properties.buildingpart === "corridor")) {
+
                                 getDoors(buildingPart, function(err, doors) {
-                                    buildingParts.push.apply(buildingParts, doors);
+                                    buildingPart.properties.doors = [];
+
+                                    doors.forEach(function(door) {
+                                        if (!(door.id in doorsToRooms)) {
+                                            doorsToRooms[door.id] = [ buildingPart ];
+                                        } else {
+                                            doorsToRooms[door.id].push(buildingPart);
+                                        }
+                                        doorsById[door.id] = door;
+
+                                        buildingParts.push(door);
+
+                                        buildingPart.properties.doors.push(door.id);
+                                    });
+
                                     callback();
                                 });
                             } else {
                                 callback();
                             }
                         }, function(err) {
+                            for (var id in doorsById) {
+                                var parts = doorsToRooms[id];
+
+                                var possibleLevels = parts[0].properties.level;
+
+                                if (typeof(possibleLevels) === "number") {
+                                    possibleLevels = [ possibleLevels ];
+                                } else if (typeof(possibleLevels) === "undefined") {
+                                    possibleLevels = [ ];
+                                }
+
+                                /*if (parts.length > 1) {
+                                    console.log(parts.length  + " parts");
+                                    console.log("initial possible levels " + JSON.stringify(possibleLevels));
+                                }*/
+
+                                for (var i=1; i<parts.length; i++) {
+                                    var partLevels = parts[i].properties.level;
+
+                                    if (typeof(partLevels) === "number") {
+                                        partLevels = [ partLevels ];
+                                    }
+
+                                    //console.log("part levels " + JSON.stringify(partLevels));
+
+                                    possibleLevels = partLevels.filter(function(possibility) {
+                                        var intersection = possibleLevels.indexOf(possibility) !== -1;
+                                        /*if (intersection) {
+                                            console.log(possibility + " is in " + JSON.stringify(possibleLevels));
+                                        } else {
+                                            console.log(possibility + " is not in " + JSON.stringify(possibleLevels));
+                                        }*/
+
+                                        return intersection;
+                                    });
+                                }
+
+                                if (possibleLevels.length !== 1) {
+                                    console.warn("Unknown level for door " + linkToLoc(doorsById[id].geometry.coordinates, true));
+                                } else {
+                                    doorsById[id].properties.level = possibleLevels[0];
+                                }
+                            }
+
                             console.log("finishing createBuildingParts");
                             callback(err, {
                                 type: "FeatureCollection",
@@ -598,10 +690,12 @@ function getDoors(room, callback) {
         }
 
         async.map(results.rows, function(part, callback) {
-            var feature = {type: "Feature", id: part.osm_id};
-            feature.geometry = JSON.parse(part.point);
-
-            feature.properties = { level: room.properties.level };
+            var feature = {
+                type: "Feature",
+                id: part.osm_id,
+                geometry: JSON.parse(part.point),
+                properties: {}
+            };
 
             callback(null, feature);
         }, callback);
