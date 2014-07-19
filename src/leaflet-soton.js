@@ -1552,7 +1552,7 @@ SELECT * WHERE {\
             url += "?" + new Date().getTime();
         }
 
-        xhttp.open('GET', options.url, true);
+        xhttp.open('GET', url, true);
         xhttp.setRequestHeader('Accept', 'application/json');
 
         xhttp.send(options.data);
