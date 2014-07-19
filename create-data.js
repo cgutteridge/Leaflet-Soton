@@ -279,7 +279,10 @@ function processBuildingParts(buildingParts, callback) {
                         console.warn("Unexpected ref \"" + part.properties.ref + "\" for room " + part.properties.uri);
                     }
                 } else {
-                    console.warn("Missing ref \"" + expectedRef + "\" for room " + part.properties.uri);
+                    // does it look like a ref (is the first character a number)
+                    if (!isNaN(expectedRef.slice(0, 1))) {
+                        console.warn("Missing ref \"" + expectedRef + "\" for room " + part.properties.uri);
+                    }
                 }
 
                 async.parallel([
