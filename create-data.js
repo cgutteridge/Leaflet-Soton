@@ -529,15 +529,48 @@ function createBuildingParts(buildings, callback) {
     // get the buildingParts and buildingRelations from the database
     //  - buildingParts are the ways tagged with buildingpart
     //  - buildingRelations are all the building relations
-    async.parallel([getBuildingParts, getBuildingEntrances, getBuildingRelations],
+    async.parallel([getBuildingParts, getBuildingEntrances, getBuildingRelations, getPortals],
         function(err, results) {
 
             // The objects in this array are modified
             var buildingParts = results[0];
             var buildingEntrances = results[1];
             var buildingRelations = results[2];
+            var portals = results[3];
 
             buildingParts.push.apply(buildingParts, buildingEntrances);
+
+            portals.forEach(function(portal) {
+                console.log(JSON.stringify(portal, null, 4));
+
+                if (portal.building in buildings) {
+                    building = buildings[portal.building]
+
+                    portal.buildingpart = "entrance";
+
+                    buildingParts.push({
+                        type: "Feature",
+                        geometry: {
+                            type: "Point",
+                            coordinates: [
+                                parseFloat(portal.lon, 10),
+                                parseFloat(portal.lat, 10)
+                            ]
+                        },
+                        properties: portal
+                    });
+
+                    buildingProperties = building.properties;
+                    if (!("entrances" in buildingProperties)) {
+                        buildingProperties.entrances = [];
+                    }
+
+                    buildingProperties.entrances.push(portal.uri);
+                    console.log(JSON.stringify(buildingProperties.entrances, null, 4));
+                } else {
+                    console.warn("cannot find building " + portal.building);
+                }
+            });
 
             async.parallel([
                 // for each room, find the features, contents and images
@@ -560,17 +593,21 @@ function createBuildingParts(buildings, callback) {
                                     part.properties.level = part.properties.level[0];
                                 }
                             } else {
-                                var loc;
-                                var reverse;
-                                if (part.geometry.type === "Point") {
-                                    loc = part.geometry.coordinates;
-                                    reverse = true;
+                                if (!("geometry" in part)) {
+                                    console.log("unknown level");
                                 } else {
-                                    loc = part.properties.center;
-                                    reverse = false;
+                                    var loc;
+                                    var reverse;
+                                    if (part.geometry.type === "Point") {
+                                        loc = part.geometry.coordinates;
+                                        reverse = true;
+                                    } else {
+                                        loc = part.properties.center;
+                                        reverse = false;
+                                    }
+                                    console.warn("unknown level " + linkToLoc(loc, reverse));
+                                    console.warn(JSON.stringify(part.properties, null, 4));
                                 }
-                                console.warn("unknown level " + linkToLoc(loc, reverse));
-                                console.warn(JSON.stringify(part.properties, null, 4));
                             }
 
                             if (part.id in osmIDToBuilding) {
@@ -903,6 +940,59 @@ SELECT ?feature ?label WHERE {\
         });
 
         callback();
+    });
+}
+
+function getPortals(callback) {
+    var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
+PREFIX portals: <http://purl.org/openorg/portals/>\
+PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>\
+SELECT * WHERE {\
+    ?portal a portals:BuildingEntrance;\
+            portals:connectsBuilding ?building;\
+            rdfs:comment ?comment;\
+            rdfs:label ?label;\
+            geo:lat ?lat;\
+            geo:long ?long;\
+    OPTIONAL {\
+        ?portal portals:connectsFloor ?floor\
+    }\
+}"
+
+    sparqlQuery(query, function(err, data) {
+        if (err) {
+            console.error("error in getPortals");
+            console.error("query " + query);
+            console.error(err);
+        }
+
+        portals = [];
+
+        data.results.bindings.forEach(function(portal) {
+            if ('error-message' in portal) {
+                console.error("error in portals");
+                console.error(JSON.stringify(feature));
+                console.error("query:\n" + query);
+                return;
+            }
+
+            var obj = {
+                uri: portal.portal.value,
+                building: portal.building.value,
+                label: portal.label.value,
+                comment: portal.comment.value,
+                lat: portal.lat.value,
+                lon: portal.long.value
+            }
+
+            if ("floor" in portal) {
+                obj.floor = portal.floor.value;
+            }
+
+            portals.push(obj);
+        });
+
+        callback(null, portals);
     });
 }
 

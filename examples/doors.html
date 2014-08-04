@@ -59,7 +59,13 @@
             var entrances = {};
             data.buildingParts.features.forEach(function(part) {
                 if (part.properties.buildingpart === "entrance") {
-                    entrances[part.id] = part;
+                    if ("uri" in part.properties) {
+                        entrances[part.properties.uri] = part;
+                    }
+
+                    if ("id" in part) {
+                        entrances[part.id] = part;
+                    }
                 }
             });
 
@@ -70,6 +76,7 @@
             data.buildingParts.features.forEach(function(part) {
                 if (part.properties.buildingpart === "room") {
                     if (!("building" in part.properties)) {
+                        console.log("unknown building");
                         console.log(part);
                         return;
                     }
@@ -84,7 +91,6 @@
                 }
             });
 
-            console.log(buildingRooms);
 
             data.buildings.features.forEach(function(building) {
                 // if the building has some entrances in the data
@@ -102,44 +108,122 @@
                     }
 
                     var entranceLocations = building.properties.entrances.map(function(entrance_id) {
+                        if (!(entrance_id in entrances)) {
+                            console.warn("cannot find entrance " + entrance_id);
+                            return;
+                        }
+
                         var entrance = entrances[entrance_id];
-                        return L.GeoJSON.coordsToLatLng(entrance.geometry.coordinates);
+                        if ("geometry" in entrance) {
+                            return L.GeoJSON.coordsToLatLng(entrance.geometry.coordinates);
+                        } else {
+                            return null;
+                        }
                     });
 
                     div.appendChild(title);
 
                     // create the list of entrances
-                    var ul = document.createElement("ul");
+                    var table = document.createElement("table");
+                    var thead = document.createElement("thead");
+
+                    var headTr = document.createElement("tr");
+
+                    function addTh(e) {
+                        var th = document.createElement("th");
+                        th.appendChild(e);
+                        headTr.appendChild(th);
+                    }
+
+                    addTh(document.createTextNode("OSM ID"));
+                    addTh(document.createTextNode("URI"));
+                    addTh(document.createTextNode("Label"));
+                    addTh(document.createTextNode("Comment"));
+                    addTh(document.createTextNode("")); // for Show
+
+                    thead.appendChild(headTr);
+                    table.appendChild(thead);
+
+                    var tbody = document.createElement("tbody");
 
                     building.properties.entrances.forEach(function(entrance_id, index) {
+                        if (!(entrance_id in entrances)) {
+                            console.warn("cannot find entrance " + entrance_id);
+                            return;
+                        }
+
+                        var tr = document.createElement("tr");
+
+                        function addToTable(e) {
+                            var td = document.createElement("td");
+                            td.appendChild(e);
+                            tr.appendChild(td);
+                        }
+
                         var entrance = entrances[entrance_id];
 
+                        var osmId;
+                        if ("id" in entrance) {
+                            osmId = document.createTextNode(entrance.id);
+                        } else {
+                            osmId = document.createTextNode("Unknown");
+                        }
+                        addToTable(osmId);
+
+                        var uri;
+                        if ("uri" in entrance.properties) {
+                            uri = document.createTextNode(entrance.properties.uri);
+                        } else {
+                            uri = document.createTextNode("Unknown");
+                         }
+                        addToTable(uri);
+
+                        var label;
+                        if ("label" in entrance.properties) {
+                            label = document.createTextNode(entrance.properties.label);
+                        } else {
+                            label = document.createTextNode("Unknown");
+                         }
+                        addToTable(label);
+
+                        var comment;
+                        if ("comment" in entrance.properties) {
+                            comment = document.createTextNode(entrance.properties.comment);
+                        } else {
+                            comment = document.createTextNode("Unknown");
+                         }
+                        addToTable(comment);
+
                         var a = document.createElement("a");
-                        a.textContent = entrance_id + " (level " + entrance.properties.level + ")";
+                        a.textContent = "Show";
                         a.href = "#";
 
                         // when the entrance is clicked
                         a.onclick = function() {
                             var coordinates = entranceLocations[index];
 
-                            console.log(rooms);
+                            if (coordinates === null) {
+                                return;
+                            }
 
                             // pan to the entrance
                             map.panTo(coordinates);
 
-                            // display the relevant level
-                            map.setLevel(entrance.properties.level);
+                            if ("level" in entrance.properties) {
+                                // display the relevant level
+                                map.setLevel(entrance.properties.level);
+                            }
 
                             return false;
                         };
 
-                        var li = document.createElement("li");
-                        li.appendChild(a);
+                        addToTable(a);
 
-                        ul.appendChild(li);
+                        tbody.appendChild(tr);
                     });
 
-                    div.appendChild(ul);
+                    table.appendChild(tbody);
+                    div.appendChild(table);
                 }
             });
         });
