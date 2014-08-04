@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Points of Service</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <link rel="stylesheet" href="../src/leaflet-soton.css" />
+
+    <link rel="stylesheet" href="../resources/leaflet-sidebar/src/L.Control.Sidebar.css" />
+    <link rel="stylesheet" href="../resources/leaflet/dist/leaflet.css" />
+
+    <style>
+        body {
+          padding: 0;
+          margin: 0;
+        }
+
+        html, body, #map {
+          height: 100%;
+        }
+        .typeahead, .tt-query, .tt-hint {
+            border: 2px solid #ccc;
+            border-radius: 8px;
+            font-size: 18px;
+            height: 30px;
+            line-height: 30px;
+            outline: medium none;
+            padding: 8px 12px;
+            width: 90%;
+        }
+        .typeahead {
+            background-color: #fff;
+        }
+        .twitter-typeahead {
+            width: 100%
+        }
+        .typeahead:focus {
+            border: 2px solid #0097cf;
+        }
+        .tt-query {
+            box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset;
+        }
+        .tt-hint {
+            color: #999;
+        }
+        .tt-dropdown-menu {
+            background-color: #fff;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+            margin-top: 12px;
+            padding: 8px 0;
+            width: 385px;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        .tt-suggestion {
+            font-size: 18px;
+            line-height: 24px;
+            padding: 3px 20px;
+        }
+        .tt-suggestion.tt-cursor {
+            background-color: #0097cf;
+            color: #fff;
+        }
+        .tt-suggestion p {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div id="sidebar">
+        <h1>Points of Service</h1>
+
+        <input id="search" class="typeahead" type="text" placeholder="What would you like to eat or drink?">
+
+        <div id="availablefrom">
+        </div>
+
+        <div id="info">
+
+        </div>
+    </div>
+
+    <script src="../resources/leaflet/dist/leaflet.js"></script>
+    <script src="../resources/leaflet-markercluster/dist/leaflet.markercluster.js"></script>
+    <script src="../resources/leaflet-indoor/leaflet-indoor.js"></script>
+    <script src="../resources/leaflet-sidebar/src/L.Control.Sidebar.js"></script>
+    <script src="../resources/jquery/dist/jquery.min.js"></script>
+    <script src="../resources/typeahead.js/dist/typeahead.bundle.min.js"></script>
+
+    <script src="../src/leaflet-soton.js"></script>
+
+    <script type="text/javascript">
+        LS.imagePath = '../resources/images/';
+        LS.dataPath = '../data.json';
+
+        var map = LS.map('map', {
+            indoor: false,
+        });
+
+        var sidebar = L.control.sidebar('sidebar', {
+            position: 'left'
+        });
+
+        map.addControl(sidebar);
+
+        setTimeout(function () {
+            sidebar.show();
+        }, 500);
+
+        var info = document.getElementById("info");
+
+        map.showInfo = function(content, latlng, options) {
+            info.innerHTML = "";
+            info.appendChild(content);
+            sidebar.show();
+        };
+
+        LS.getData(function(data) { var layer = LS.getPointOfServiceLayer();
+            layer.addTo(map);
+
+            var substringMatcher = function(strs) {
+                return function findMatches(q, cb) {
+                    var matches, substrRegex;
+                    // an array that will be populated with substring matches
+                    matches = [];
+
+                    // regex used to determine if a string contains the substring `q`
+                    substrRegex = new RegExp(q, 'i');
+
+                    // iterate through the pool of strings and for any string that
+                    // contains the substring `q`, add it to the `matches` array
+                    $.each(strs, function(i, str) {
+                        if (substrRegex.test(str)) {
+                            // the typeahead jQuery plugin expects suggestions to a
+                            // JavaScript object, refer to typeahead docs for more info
+                            matches.push({ value: str });
+                        }
+                    });
+
+                cb(matches);
+                };
+            };
+
+            var itemMap = {};
+
+            data.pointsOfService.features.forEach(function(feature) {
+                if ("offerings" in feature.properties) {
+                    var offerings = feature.properties.offerings;
+
+                    var sections = Object.keys(offerings);
+
+                    sections.forEach(function(sectionURI) {
+                        var section = offerings[sectionURI];
+
+                        section.items.forEach(function(item) {
+                            var obj = {
+                                uri: item.uri,
+                                feature: feature
+                            };
+
+                            if (item.label in itemMap) {
+                                itemMap[item.label].push(obj);
+                            } else {
+                                itemMap[item.label] = [ obj ];
+                            }
+                        });
+                    });
+                }
+            });
+
+            var items = Object.keys(itemMap);
+
+            var $search = $('#search');
+
+            $search.typeahead(
+                {
+                    hint: true,
+                    highlight: true,
+                    minLength: 1
+                },
+                {
+                    name: 'states',
+                    displayKey: 'value',
+                    source: substringMatcher(items)
+                }
+            );
+
+            var availableFrom = document.getElementById("availablefrom");
+
+            $search.keyup(function() {
+                var val = $search.val();
+
+                if (val in itemMap) {
+                    var uris = itemMap[val];
+
+                    availableFrom.innerHTML = "";
+
+                    var ul = document.createElement("ul");
+
+                    uris.forEach(function(result) {
+                        var feature = result.feature;
+                        console.log(feature.properties);
+                        var li = document.createElement("li");
+
+                        var a = document.createElement("a");
+                        a.textContent = feature.properties.name; //+ " (" + result.uri + ")";
+                        a.href = "#";
+                        a.onclick = function() {
+                            console.log(feature.properties.uri);
+                            map.show(feature.properties.uri);
+                            return false;
+                        };
+
+                        li.appendChild(a);
+                        ul.appendChild(li);
+                    });
+
+                    availableFrom.appendChild(ul);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

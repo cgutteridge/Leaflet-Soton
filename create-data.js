@@ -50,6 +50,37 @@ pgql.connect('tcp://' + config.user + ':' +
         createTables,
         // Get the data from these tables
         createCollections,
+        function(collections, callback) {
+
+            async.each(collections.pointsOfService.features, function(feature, callback) {
+
+                if ("uri" in feature.properties) {
+                    async.parallel([
+                        function(callback) {
+                            getOfferings(feature.properties.uri, function(err, offerings) {
+                                feature.properties.offerings = offerings;
+
+                                callback();
+                            });
+                        },
+                        function(callback) {
+                            getDescription(feature.properties.uri, function(err, description) {
+                                feature.properties.description = description;
+
+                                callback();
+                            });
+                        }],
+                        callback
+                    );
+                } else {
+                    console.warn("missing uri for point of service");
+
+                    callback();
+                }
+            }, function(err) {
+                callback(null, collections);
+            });
+        },
         // Now the basic collections have been created, handle the more complicated
         // ones:
         //  - busStops
@@ -192,7 +223,8 @@ function createCollections(callback) {
         parking: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,\
                  name,access,capacity,"capacity:disabled",fee from uni_parking',
         bicycleParking: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,capacity,bicycle_parking,covered from uni_bicycle_parking',
-        sites: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,name,loc_ref,uri from uni_site'
+        sites: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,name,loc_ref,uri from uni_site',
+        pointsOfService: "select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,ST_AsText(ST_Transform(ST_Centroid(way), 4326)) as center,name,shop,amenity,uri from planet_osm_polygon where (amenity in ('cafe', 'bar', 'restaurant') or shop in ('kiosk', 'convenience')) and ST_Contains((select ST_Union(way) from uni_site), way);"
     };
 
     var names = Object.keys(collectionQueries);
@@ -243,6 +275,7 @@ function createCollection(name, query, callback) {
                 var center = feature.properties.center;
                 center = center.slice(6, -1);
                 center = center.split(" ").reverse();
+                center = center.map(parseFloat);
                 feature.properties.center = center;
             }
 
@@ -523,6 +556,90 @@ function getLibraryData(library_data, callback) {
     }));
 }
 
+function getOfferings(uri, callback) {
+
+    var query = "PREFIX ns0: <http://purl.org/goodrelations/v1#>\
+    PREFIX oo: <http://purl.org/openorg/>\
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
+    SELECT DISTINCT ?includes ?label ?section ?sectionLabel WHERE {\
+        ?offering a ns0:Offering ;\
+                    ns0:includes ?includes ;\
+                    ns0:availableAtOrFrom ?pos ;\
+                    oo:priceListSection ?section .\
+        ?includes rdfs:label ?label .\
+        ?section rdfs:label ?sectionLabel\
+        FILTER (\
+            ?pos = <URI>\
+        )\
+    }";
+
+    query = query.replace("URI", uri);
+
+    sparqlQuery(query, function(err, data) {
+        if (err) {
+            console.error("Query " + query);
+            console.error(err);
+            callback(err);
+            return;
+        }
+
+        var offerings = {};
+
+        data.results.bindings.forEach(function(result) {
+            var section = result.section.value;
+
+            var item = {
+                label: result.label.value,
+                uri: result.includes.value
+            };
+
+            if (section in offerings) {
+                offerings[section].items.push(item);
+            } else {
+                offerings[section] = {
+                    label: result.sectionLabel.value,
+                    items: [ item ]
+                };
+            }
+        });
+
+        callback(null, offerings);
+    });
+}
+
+function getDescription(uri, callback) {
+
+    var query = "PREFIX dcterms: <http://purl.org/dc/terms/>\
+    SELECT ?description WHERE {\
+        ?uri dcterms:description ?description;\
+        FILTER (\
+            ?uri = <URI>\
+        )\
+    }";
+
+    query = query.replace("URI", uri);
+
+    sparqlQuery(query, function(err, data) {
+        if (err) {
+            console.error("Query " + query);
+            console.error(err);
+            callback(err);
+            return;
+        }
+
+        var b = data.results.bindings;
+
+        var desc;
+        if (b.length == 0) {
+            desc = "";
+        } else {
+            desc = b[0].description.value
+        }
+
+        callback(null, desc);
+    });
+}
+
 function createBuildingParts(buildings, callback) {
     console.info("creating buildingParts collection");
 
@@ -675,6 +792,10 @@ function createBuildingParts(buildings, callback) {
 
                                 for (var i=1; i<parts.length; i++) {
                                     var partLevels = parts[i].properties.level;
+
+                                    if (typeof(partLevels) === "undefined") {
+                                        continue;
+                                    }
 
                                     if (typeof(partLevels) === "number") {
                                         partLevels = [ partLevels ];

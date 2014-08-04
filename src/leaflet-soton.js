@@ -108,7 +108,51 @@
 
                         var content = vendingPopupTemplate(feature.properties);
 
-                        showPopup(map, content, e.latlng, popupOptions);
+                        // TODO: Unsure if map is accessible?
+                        map.showInfo(content, e.latlng, popupOptions);
+                    });
+                }
+            });
+
+            return layer;
+        },
+        getPointOfServiceLayer: function() {
+            var features = this.data.pointsOfService.features;
+
+            var pointFeatures = features.map(function(feature) {
+                var pointFeature = {
+                    type: "Feature",
+                    geometry: {
+                        type: "Point"
+                    },
+                    properties: feature.properties
+                };
+
+                console.log(feature.properties);
+                var c = feature.properties.center;
+                c = [c[1], c[0]];
+                pointFeature.geometry.coordinates = c;
+
+                return pointFeature;
+            });
+
+            var layer = new L.GeoJSON(pointFeatures, {
+                pointToLayer: function(feature, latlng) {
+                    var icon;
+
+                    icon = icons.vendingHotDrinks;
+
+                    return L.marker(latlng, {icon: icon});
+                },
+                onEachFeature: function(feature, layer) {
+                    layer.on('click', function(e) {
+                        var popupOptions = {
+                            offset: icons.vendingHotDrinks.options.popupAnchor
+                        };
+
+                        var content = pointOfServiceTemplate(feature.properties);
+
+                        map.showInfo(content, e.latlng, popupOptions);
                     });
                 }
             });
@@ -375,7 +419,7 @@ SELECT * WHERE {\
                                                            map,
                                                            function() { close(); });
 
-                            close = showPopup(map, content, e.latlng);
+                            close = map.showInfo(content, e.latlng);
                         });
                     };
                 } else {
@@ -384,7 +428,7 @@ SELECT * WHERE {\
                         layer.on('click', function(e) {
                             var content = popupTemplates[layerName](feature.properties);
 
-                            showPopup(map, content, e.latlng);
+                            map.showInfo(content, e.latlng);
                         });
                     };
                 }
@@ -618,7 +662,7 @@ SELECT * WHERE {\
                                         }
                                     }
 
-                                    showPopup(map, content, e.latlng, popupOptions);
+                                    map.showInfo(content, e.latlng, popupOptions);
                                 });
                             },
                             pointToLayer: function (feature, latlng) {
@@ -742,7 +786,7 @@ SELECT * WHERE {\
 
                     map.panTo(center);
 
-                    close = showPopup(map, content, center);
+                    close = map.showInfo(content, center);
 
                     return;
                 }
@@ -798,6 +842,49 @@ SELECT * WHERE {\
             } else {
                 throw "unable to handle " + feature.geometry.type;
             }
+        },
+        showInfo: function(content, latlng, options) {
+            options = options || {};
+
+            options.maxWidth = map.getContainer().offsetWidth;
+
+            var close;
+
+            if (false && smallScreen()) {
+                // Just in case there is a popup open, as the screen has just shrunk
+                map.closePopup();
+
+                var containerWrapper = document.getElementById('dynamicContentWrapper');
+                containerWrapper.style.display = 'block';
+
+                var container = document.getElementById('dynamicContent');
+
+                var contentDiv = document.createElement('div');
+
+                var closeButton = L.DomUtil.create('button', 'close', container);
+                closeButton.setAttribute('aria-hidden', 'true');
+                closeButton.setAttribute('type', 'button');
+                closeButton.textContent = 'x';
+
+                close = closeButton.onclick = function() {
+                    container.innerHTML = '';
+                    containerWrapper.style.display = 'none';
+                };
+
+                container.appendChild(content);
+            } else {
+                var popup = L.popup(options).setLatLng(latlng);
+
+                popup.setContent(content);
+
+                popup.openOn(map);
+
+                close = function() {
+                    map.closePopup(popup);
+                };
+            }
+
+            return close;
         }
     });
 
@@ -817,50 +904,6 @@ SELECT * WHERE {\
         }
 
         return L.marker(latlng, {icon: icon});
-    }
-
-    function showPopup(map, content, latlng, popupOptions) {
-        popupOptions = popupOptions || {};
-
-        popupOptions.maxWidth = map.getContainer().offsetWidth;
-
-        var close;
-
-        if (false && smallScreen()) {
-            // Just in case there is a popup open, as the screen has just shrunk
-            map.closePopup();
-
-            var containerWrapper = document.getElementById('dynamicContentWrapper');
-            containerWrapper.style.display = 'block';
-
-            var container = document.getElementById('dynamicContent');
-
-            var contentDiv = document.createElement('div');
-
-            var closeButton = L.DomUtil.create('button', 'close', container);
-            closeButton.setAttribute('aria-hidden', 'true');
-            closeButton.setAttribute('type', 'button');
-            closeButton.textContent = 'x';
-
-            close = closeButton.onclick = function() {
-                container.innerHTML = '';
-                containerWrapper.style.display = 'none';
-            };
-
-            container.appendChild(content);
-        } else {
-            var popup = L.popup(popupOptions).setLatLng(latlng);
-
-            popup.setContent(content);
-
-            popup.openOn(map);
-
-            close = function() {
-                map.closePopup(popup);
-            };
-        }
-
-        return close;
     }
 
     // Template functions for creating the popups
@@ -1300,6 +1343,40 @@ SELECT * WHERE {\
                         });
                     }
                 }
+            }
+        });
+    }
+
+    function pointOfServiceTemplate(properties) {
+        return getTemplateWrapper(properties, function(content) {
+
+            var description = document.createElement("div");
+            if ("description" in properties) {
+                description.innerHTML = properties.description;
+            } else {
+                description.textContent = "No Description Available";
+            }
+            content.appendChild(description);
+
+            if ("offerings" in properties) {
+                Object.keys(properties.offerings).forEach(function(sectionURI) {
+                    var section = properties.offerings[sectionURI];
+
+                    var header = document.createElement("h4");
+                    header.textContent = section.label;
+
+                    content.appendChild(header);
+
+                    section.items.forEach(function(item) {
+                        var a = document.createElement("a");
+
+                        a.textContent = item.label;
+                        a.href = item.uri;
+
+                        content.appendChild(a);
+                        content.appendChild(document.createElement("br"));
+                    });
+                });
             }
         });
     }

@@ -28,3 +28,12 @@
 [submodule "resources/leaflet-textpath"]
 	path = resources/leaflet-textpath
 	url = https://github.com/makinacorpus/Leaflet.TextPath.git
+[submodule "resources/typeahead.js"]
+	path = resources/typeahead.js
+	url = https://github.com/twitter/typeahead.js.git
+[submodule "resources/leaflet-sidebar"]
+	path = resources/leaflet-sidebar
+	url = https://github.com/Turbo87/leaflet-sidebar.git
+[submodule "resources/jquery"]
+	path = resources/jquery
+	url = https://github.com/jquery/jquery.git
