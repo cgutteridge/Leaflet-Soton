@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Map - University of Southampton</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <link rel="stylesheet" href="../resources/leaflet-locatecontrol/src/L.Control.Locate.css" />
+    <link rel="stylesheet" href="../resources/leaflet/dist/leaflet.css" />
+
+    <link rel="stylesheet" href="../src/leaflet-soton.css" />
+
+    <style>
+        body {
+          padding: 0;
+          margin: 0;
+        }
+
+        html, body {
+          height: 100%;
+        }
+
+        #map, #data {
+          height: 50%;
+        }
+
+        #data {
+            overflow-y: scroll
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div id="data"></div>
+
+    <script src="../resources/leaflet/dist/leaflet.js"></script>
+    <script src="../resources/leaflet-markercluster/dist/leaflet.markercluster.js"></script>
+    <script src="../resources/leaflet-locatecontrol/src/L.Control.Locate.js"></script>
+    <script src="../resources/leaflet-hash/leaflet-hash.js"></script>
+    <script src="../resources/leaflet-indoor/leaflet-indoor.js"></script>
+
+    <script src="../src/leaflet-soton.js"></script>
+
+    <script type="text/javascript">
+        LS.imagePath = '../resources/images/';
+        LS.dataPath = '../data.json';
+
+        var map = LS.map('map', {
+            workstations: true,
+            indoor: true,
+            zoom: 20
+        });
+
+        var div = document.getElementById("data");
+
+        LS.getData(function(data) {
+            // first index the entrances, as they cannot be looked up easily,
+            // as they do not have uri's
+            var entrances = {};
+            data.buildingParts.features.forEach(function(part) {
+                if (part.properties.buildingpart === "entrance") {
+                    entrances[part.id] = part;
+                }
+            });
+
+            var buildingRooms = {};
+
+            // Find the building rooms (probably something that the library
+            // should help with, but it does not (yet)
+            data.buildingParts.features.forEach(function(part) {
+                if (part.properties.buildingpart === "room") {
+                    if (!("building" in part.properties)) {
+                        console.log(part);
+                        return;
+                    }
+
+                    var building = part.properties.building;
+
+                    if (building in buildingRooms) {
+                        buildingRooms[building].push(part);
+                    } else {
+                        buildingRooms[building] = [ part ];
+                    }
+                }
+            });
+
+            console.log(buildingRooms);
+
+            data.buildings.features.forEach(function(building) {
+                // if the building has some entrances in the data
+                if ("entrances" in building.properties) {
+
+                    var title = document.createElement("h2");
+                    title.textContent = building.properties.name;
+
+                    if (building.properties.uri in buildingRooms) {
+                        var rooms = buildingRooms[building.properties.uri];
+
+                        var roomLocations = rooms.map(function(room) {
+                            return L.GeoJSON.coordsToLatLng(room.properties.center);
+                        });
+                    }
+
+                    var entranceLocations = building.properties.entrances.map(function(entrance_id) {
+                        var entrance = entrances[entrance_id];
+                        return L.GeoJSON.coordsToLatLng(entrance.geometry.coordinates);
+                    });
+
+                    div.appendChild(title);
+
+                    // create the list of entrances
+                    var ul = document.createElement("ul");
+
+                    building.properties.entrances.forEach(function(entrance_id, index) {
+                        var entrance = entrances[entrance_id];
+
+                        var a = document.createElement("a");
+                        a.textContent = entrance_id + " (level " + entrance.properties.level + ")";
+                        a.href = "#";
+
+                        // when the entrance is clicked
+                        a.onclick = function() {
+                            var coordinates = entranceLocations[index];
+
+                            console.log(rooms);
+
+                            // pan to the entrance
+                            map.panTo(coordinates);
+
+                            // display the relevant level
+                            map.setLevel(entrance.properties.level);
+
+                            return false;
+                        };
+
+                        var li = document.createElement("li");
+                        li.appendChild(a);
+
+                        ul.appendChild(li);
+                    });
+
+                    div.appendChild(ul);
+                }
+            });
+        });
+
+        L.control.locate().addTo(map);
+    </script>
+</body>
+</html>
