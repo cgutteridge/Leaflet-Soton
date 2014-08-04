@@ -643,6 +643,10 @@ function createBuildingParts(buildings, callback) {
                                         partLevels = [ partLevels ];
                                     }
 
+                                    if (typeof(partLevels) === "undefined") {
+                                        continue;
+                                    }
+
                                     //console.log("part levels " + JSON.stringify(partLevels));
 
                                     possibleLevels = partLevels.filter(function(possibility) {
