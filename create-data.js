@@ -13,18 +13,10 @@ S.extendPrototype();
 var fs = require('fs');
 var http = require("http");
 var async = require("async");
-var yaml = require('js-yaml');
 
 var config = require("./config.json");
 
 var library_data = require("./resources/hartley-library-map-data/data.json");
-
-try {
-    var printers = yaml.safeLoad(fs.readFileSync('./resources/mfd-location/data.yaml', 'utf8'));
-} catch (e) {
-    console.error(e);
-    return;
-}
 
 var validationByURI = {};
 
@@ -1191,7 +1183,7 @@ PREFIX soton: <http://id.southampton.ac.uk/ns/>\
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
 PREFIX ns1: <http://vocab.deri.ie/rooms#>\
 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>\
-SELECT * WHERE {\
+SELECT DISTINCT * WHERE {\
     ?mdf a <http://www.productontology.org/id/Multifunction_printer> ;\
          rdfs:label ?label ;\
          <http://data.ordnancesurvey.co.uk/ontology/spatialrelations/within> ?building .\
@@ -1213,6 +1205,7 @@ SELECT * WHERE {\
 
         // For validation
         var openDataPrinterURIs = {}
+        var printersWithLocations = 0;
 
         async.map(data.results.bindings, function(result, callback) {
             if ('error-message' in result) {
@@ -1242,13 +1235,23 @@ SELECT * WHERE {\
                 }
             };
 
-            if (uri in printers) {
-                feature.geometry = {
-                    type: "Point",
-                    coordinates: printers[uri].coordinates
-                };
+            var printers = require("./resources/mfd-location/data.json");
 
-                feature.properties.level = parseInt(printers[uri].level, 10);
+            var printersByURI = {}
+            printers.features.forEach(function(printer) {
+                printersByURI[printer.properties.uri] = printer;
+            });
+
+            if (uri in printersByURI) {
+                printer = printersByURI[uri];
+
+                feature.geometry = printer.geometry;
+
+                feature.properties.level = printer.properties.level;
+
+                printersWithLocations += 1;
+            } else {
+                console.error("error printer " + uri + " is not known");
             }
 
             if (building in buildings) {
@@ -1273,16 +1276,6 @@ SELECT * WHERE {\
 
             callback(null, feature);
         }, function(err, results) {
-            var printersWithLocations = 0;
-
-            Object.keys(printers).forEach(function(uri) {
-                if (!(uri in openDataPrinterURIs)) {
-                    console.error("error printer " + uri + " is not known");
-                } else {
-                    printersWithLocations++;
-                }
-            });
-
             console.info("finished processing printers (" + printersWithLocations + "/" + Object.keys(openDataPrinterURIs).length + ")");
 
             async.filter(results,
