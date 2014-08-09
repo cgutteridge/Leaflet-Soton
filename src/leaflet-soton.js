@@ -1844,7 +1844,7 @@ SELECT * WHERE {\
                         var popupOptions = {offset: [0, -15]};
                         var content = workstationsTemplate([uri]);
 
-                        showPopup(this._map, content, a.latlng, popupOptions);
+                        this._map.showInfo(content, a.latlng, popupOptions);
                     }).on('clusterclick', function (a) {
                         var uris = a.layer.getAllChildMarkers().map(function(marker) {
                             return marker.uri;
@@ -1854,7 +1854,7 @@ SELECT * WHERE {\
 
                         var content = workstationsTemplate(uris);
 
-                        showPopup(this._map, content, a.latlng, popupOptions);
+                        this._map.showInfo(content, a.latlng, popupOptions);
                     });
                 });
 
