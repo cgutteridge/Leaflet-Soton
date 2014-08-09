@@ -1994,9 +1994,8 @@ OPTIONAL { ?image dcterms:license ?license ; }\
 
             var obj = {};
             obj.url = image.image.value;
-            obj.width = image.width.value;
-            obj.height = image.height.value;
-
+            obj.width = parseInt(image.width.value, 10);
+            obj.height = parseInt(image.height.value, 10);
 
             var imageName = obj.url.split("/").slice(-1)[0];
 
