@@ -1204,13 +1204,10 @@ SELECT * WHERE {\
             // Rooms
             if (indoor) {
 
-                tabs.rooms.style.minWidth = imageWidth + "px";
                 tabs.rooms.style.minHeight = imageHeight + "px";
-
-                tabs.rooms.style.maxWidth = imageWidth + "px";
                 tabs.rooms.style.maxHeight = imageHeight + "px";
 
-                tabs.rooms.style.overflow = 'scroll';
+                tabs.rooms.style.overflow = 'auto';
 
                 for (var level in properties.rooms) {
                     var rooms = properties.rooms[level];
@@ -1273,13 +1270,10 @@ SELECT * WHERE {\
                     });
                 }
 
-                tabs.services.style.minWidth = imageWidth + "px";
                 tabs.services.style.minHeight = imageHeight + "px";
-
-                tabs.services.style.maxWidth = imageWidth + "px";
                 tabs.services.style.maxHeight = imageHeight + "px";
 
-                tabs.services.style.overflow = 'scroll';
+                tabs.services.style.overflow = 'auto';
 
                 if ("services" in properties) {
                     if ("vendingMachines" in properties.services) {
