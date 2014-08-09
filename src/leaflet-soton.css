@@ -6,6 +6,11 @@
     font: 25px/16px Arial, Helvetica, sans-serif;
 }
 
+.ls-popup-uri {
+    float: right;
+    text-decoration: none;
+}
+
 .ls-levelselector {
     line-height: 18px;
     color: #555;

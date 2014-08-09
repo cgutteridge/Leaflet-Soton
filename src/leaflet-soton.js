@@ -1479,21 +1479,21 @@ SELECT * WHERE {\
     }
 
     function getTemplateWrapper(properties, contentFunction) {
-        var table = document.createElement('table');
+        var div = document.createElement("div");
 
-        table.classList.add("ls-content-table");
+        if ('uri' in properties) {
+            var link = document.createElement('a');
+            link.setAttribute('href', properties.uri);
+            link.setAttribute('target', '_blank');
+            link.className = 'ls-popup-uri';
+            link.textContent = "(More Information)";
 
-        table.setAttribute('style', 'width: 100%');
-
-        var headingRow = document.createElement('tr');
-        table.appendChild(headingRow);
-
-        var titleData = document.createElement('td');
-        headingRow.appendChild(titleData);
+            div.appendChild(link);
+        }
 
         var title = document.createElement('h2');
         title.classList.add("ls-popup-title");
-        titleData.appendChild(title);
+        div.appendChild(title);
 
         var titleText = "";
 
@@ -1507,21 +1507,9 @@ SELECT * WHERE {\
 
         title.textContent = titleText;
 
-        var moreInfo = L.DomUtil.create('td', '', headingRow);
-        moreInfo.setAttribute('align', 'right');
+        contentFunction(div);
 
-        if ('uri' in properties) {
-            createBlankLink(properties.uri, '(More Information)', moreInfo);
-        }
-
-        var contentRow = L.DomUtil.create('tr', '', table);
-
-        var contentData = L.DomUtil.create('td', '', contentRow);
-        contentData.setAttribute('colspan', '2');
-
-        contentFunction(contentData);
-
-        return table;
+        return div;
     }
 
     var createTabs = function(tabs, container) {
