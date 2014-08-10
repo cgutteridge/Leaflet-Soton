@@ -815,10 +815,12 @@ SELECT * WHERE {\
                 var bounds = L.latLngBounds(coords);
                 this.fitBounds(bounds);
 
-                if (L.Util.isArray(feature.properties.level)) {
-                    this.setLevel(feature.properties.level[0]);
-                } else {
-                    this.setLevel(feature.properties.level);
+                if ("level" in feature.properties) {
+                    if (L.Util.isArray(feature.properties.level)) {
+                        this.setLevel(feature.properties.level[0]);
+                    } else {
+                        this.setLevel(feature.properties.level);
+                    }
                 }
 
                 this.closePopup();
