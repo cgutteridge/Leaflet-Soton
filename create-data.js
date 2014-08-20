@@ -175,8 +175,8 @@ function createTables(callback) {
     var tableSelects = {
         site: "select way,name,loc_ref,uri,amenity,landuse \
                 from planet_osm_polygon \
-                where operator='University of Southampton'",
-        building: 'select way,coalesce("addr:housename", name, \'\') as name,coalesce(height::int, "building:levels"::int * 10, 10) as height,loc_ref,leisure,uri, case when coalesce("addr:housename", name, \'\')=\'\' or "addr:housename"="addr:housenumber" then true else false end as minor from planet_osm_polygon where ST_Contains((select ST_Union(way) from uni_site), way) and building is not null order by z_order,way_area desc',
+                where uri like 'http://id.southampton.ac.uk/site/%'",
+        building: "select way,coalesce(\"addr:housename\", name, \'\') as name,coalesce(height::int, \"building:levels\"::int * 10, 10) as height,loc_ref,leisure,uri, case when coalesce(\"addr:housename\", name, \'\')=\'\' or \"addr:housename\"=\"addr:housenumber\" then true else false end as minor from planet_osm_polygon where (ST_Contains((select ST_Union(way) from uni_site), way) or uri like 'http://id.southampton.ac.uk/building/%') and building is not null order by z_order,way_area desc",
         parking: 'select way,name,access,capacity,"capacity:disabled",fee from planet_osm_polygon where amenity=\'parking\' and ST_Contains((select ST_Union(way) from uni_site), way)',
         bicycle_parking: "select way,capacity,bicycle_parking,covered from planet_osm_polygon where amenity='bicycle_parking' and ST_Contains((select ST_Union(way) from uni_site), way) union select way,capacity,bicycle_parking,covered from planet_osm_point where amenity='bicycle_parking' and ST_Contains((select ST_Union(way) from uni_site), way)"
     };
