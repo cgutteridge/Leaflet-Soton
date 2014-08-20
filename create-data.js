@@ -1515,6 +1515,17 @@ function loadBusData(collections, callback) {
         function(routes, callback) {
             async.eachSeries(routes, function(route, callback) {
                 processRoute(route, null, stopAreaRoutes, function(err, feature) {
+                    // Check if this route is a duplicate
+
+                    for (var i in collections.busRoutes.features) {
+                        var route = collections.busRoutes.features[i];
+
+                        if (route.properties.name === feature.properties.name) {
+                            callback(err);
+                            return;
+                        }
+                    }
+
                     collections.busRoutes.features.push(feature);
 
                     callback(err);
