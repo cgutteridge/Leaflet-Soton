@@ -350,6 +350,7 @@ SELECT * WHERE {\
             busRouteControl: false,
             workstations: false,
             zoom: 17,
+            detectRetina: true,
             tileUrl: 'http://bus.southampton.ac.uk/graphics/map/tiles/{z}/{x}/{y}.png',
             tileAttribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
         },
@@ -708,8 +709,13 @@ SELECT * WHERE {\
                     }
 
                     if (options.indoor) {
+                        var level = 19;
+                        if (L.Browser.retina) {
+                            level = 18;
+                        }
+
                         var setIndoorContent = function(zoom) {
-                            if (zoom <= 19) {
+                            if (zoom <= level) {
                                 if (showingIndoorControl) {
                                     map.levelControl.removeFrom(map);
                                     showingIndoorControl = false;
@@ -722,7 +728,7 @@ SELECT * WHERE {\
                                 if (options.workstations && !map.hasLayer(workstationMarkerLayer)) {
                                     map.addLayer(workstationMarkerLayer);
                                 }
-                            } else if (zoom > 19) {
+                            } else if (zoom > level) {
                                 if (!showingIndoorControl) {
                                     map.levelControl.addTo(map);
                                     showingIndoorControl = true;
