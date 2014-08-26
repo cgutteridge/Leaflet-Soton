@@ -413,14 +413,12 @@ SELECT * WHERE {\
                     layerOptions.onEachFeature = function(feature, layer) {
                         // When the feature is clicked on
                         layer.on('click', function(e) {
-                            var close;
-
                             var content = buildingTemplate(feature.properties,
-                                                           options.indoor,
+                                                           options,
                                                            map,
-                                                           function() { close(); });
+                                                           function() { map.closeInfo(); });
 
-                            close = map.showInfo(content, e.latlng);
+                            map.showInfo(content, e.latlng);
                         });
                     };
                 } else {
@@ -655,7 +653,7 @@ SELECT * WHERE {\
                                     // When the feature is clicked on
                                     if ("buildingpart" in feature.properties) {
                                         if (feature.properties.buildingpart === "room") {
-                                            content = roomPopupTemplate(feature.properties);
+                                            content = roomPopupTemplate(feature.properties, options);
                                         } else if (feature.properties.buildingpart === "verticalpassage") {
                                             content = verticalPassagePopupTemplate(feature.properties);
                                         }
@@ -784,12 +782,10 @@ SELECT * WHERE {\
                 var building = buildings[i];
 
                 if (building.properties.uri === uri) {
-                    var close;
-
                     var content = buildingTemplate(building.properties,
-                                               this.options.indoor,
+                                               this.options,
                                                map,
-                                               function() { close(); });
+                                               function() { map.closeInfo(); });
 
                     var temp = { _rings: building.geometry.coordinates, _map: this };
 
@@ -799,7 +795,7 @@ SELECT * WHERE {\
 
                     map.panTo(center);
 
-                    close = map.showInfo(content, center);
+                    map.showInfo(content, center);
 
                     return;
                 }
@@ -863,43 +859,19 @@ SELECT * WHERE {\
 
             options.maxWidth = map.getContainer().offsetWidth;
 
-            var close;
+            map.closeInfo();
 
-            if (false && smallScreen()) {
-                // Just in case there is a popup open, as the screen has just shrunk
-                map.closePopup();
+            var popup = L.popup(options).setLatLng(latlng);
+            map._popup = popup;
 
-                var containerWrapper = document.getElementById('dynamicContentWrapper');
-                containerWrapper.style.display = 'block';
+            popup.setContent(content);
 
-                var container = document.getElementById('dynamicContent');
-
-                var contentDiv = document.createElement('div');
-
-                var closeButton = L.DomUtil.create('button', 'close', container);
-                closeButton.setAttribute('aria-hidden', 'true');
-                closeButton.setAttribute('type', 'button');
-                closeButton.textContent = 'x';
-
-                close = closeButton.onclick = function() {
-                    container.innerHTML = '';
-                    containerWrapper.style.display = 'none';
-                };
-
-                container.appendChild(content);
-            } else {
-                var popup = L.popup(options).setLatLng(latlng);
-
-                popup.setContent(content);
-
-                popup.openOn(map);
-
-                close = function() {
-                    map.closePopup(popup);
-                };
+            popup.openOn(map);
+        },
+        closeInfo: function() {
+            if (map._popup) {
+                map.closePopup(map._popup);
             }
-
-            return close;
         }
     });
 
@@ -930,7 +902,7 @@ SELECT * WHERE {\
         parking: parkingTemplate,
     };
 
-    function roomPopupTemplate(properties) {
+    function roomPopupTemplate(properties, options) {
         properties = L.extend({}, properties);
 
         if (!("name" in properties)) {
@@ -1023,11 +995,16 @@ SELECT * WHERE {\
                         imageWidth = version.width;
                         imageHeight = version.height;
 
-                        var mapContainer = map.getContainer();
-                        var widthBound = mapContainer.offsetWidth;
-                        var heightBound = mapContainer.offsetHeight;
+                        var widthBound;
+                        var heightBound;
+                        if ("popupWidth" in options && "popupHeight" in options) {
+                            widthBound = options.popupWidth;
+                            heightBound = options.popupHeight;
+                        } else {
+                            var mapContainer = map.getContainer();
+                            widthBound = mapContainer.offsetWidth;
+                            heightBound = mapContainer.offsetHeight;
 
-                        if (!smallScreen()) {
                             widthBound *= 0.7;
                             heightBound *= 0.7;
                         }
@@ -1117,7 +1094,9 @@ SELECT * WHERE {\
         });
     }
 
-    function buildingTemplate(properties, indoor, map, close) {
+    function buildingTemplate(properties, options, map, close) {
+        var indoor = options.indoor;
+
         return getTemplateWrapper(properties, function(content) {
 
             var buildingTabs = [
@@ -1153,21 +1132,26 @@ SELECT * WHERE {\
                 var versions = properties.images[0].versions;
                 var url;
 
+                var widthBound;
+                var heightBound;
+                if ("popupWidth" in options && "popupHeight" in options) {
+                    widthBound = options.popupWidth;
+                    heightBound = options.popupHeight;
+                } else {
+                    var mapContainer = map.getContainer();
+                    widthBound = mapContainer.offsetWidth;
+                    heightBound = mapContainer.offsetHeight;
+
+                    widthBound *= 0.7;
+                    heightBound *= 0.7;
+                }
+
                 for (var i=0; i<versions.length; i++) {
                     var version = versions[i];
                     url = version.url;
 
                     imageWidth = version.width;
                     imageHeight = version.height;
-
-                    var mapContainer = map.getContainer();
-                    var widthBound = mapContainer.offsetWidth;
-                    var heightBound = mapContainer.offsetHeight;
-
-                    if (!smallScreen()) {
-                        widthBound *= 0.7;
-                        heightBound *= 0.7;
-                    }
 
                     if (imageWidth < widthBound &&
                         imageHeight < heightBound) {
@@ -1541,6 +1525,7 @@ SELECT * WHERE {\
                 activeLi = li;
 
                 li.classList.add('active');
+                div.style.display = 'block';
             } else {
                 div.style.display = 'none';
             }
