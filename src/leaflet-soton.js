@@ -352,7 +352,8 @@ SELECT * WHERE {\
             zoom: 17,
             detectRetina: true,
             tileUrl: 'http://bus.southampton.ac.uk/graphics/map/tiles/{z}/{x}/{y}.png',
-            tileAttribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors'
+            tileAttribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors',
+            levelControlPosition: 'bottomright'
         },
 
         initialize: function (id, options) {
@@ -690,7 +691,8 @@ SELECT * WHERE {\
 
                         map.levelControl = L.Control.level({
                             levels: map.indoorLayer.getLevels(),
-                            level: map._startLevel
+                            level: map._startLevel,
+                            position: options.levelControlPosition
                         });
 
                         map.levelControl.addEventListener("levelchange", map.indoorLayer.setLevel, map.indoorLayer);
