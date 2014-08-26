@@ -113,11 +113,14 @@ body { height: 100%; margin: 0px; padding: 0px }
 
 <script src="../resources/leaflet/dist/leaflet.js"></script>
 <script src="../src/leaflet-soton.js"></script>
+<script src="../resources/leaflet-indoor/leaflet-indoor.js"></script>
 <script type="text/javascript">
     LS.imagePath = '../resources/images/';
     LS.dataPath = '../data.json';
 
-    var map = LS.map('map');
+    var map = LS.map('map', {
+        indoor: true
+    });
 
     LS.on("dataload", function(data) {
         var searchBox = document.getElementById("searchBox");
@@ -146,7 +149,7 @@ body { height: 100%; margin: 0px; padding: 0px }
                     a.href = "#";
 
                     a.onclick = function() {
-                        map.showPopupByURI(building.properties.uri);
+                        map.showByURI(building.properties.uri);
                     };
 
                     var label = document.createElement("span");
