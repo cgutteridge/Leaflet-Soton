@@ -470,7 +470,7 @@ SELECT * WHERE {\
                     layer.addData(data[layerName]);
                 }
 
-                if (options.busRoutes) {
+                if ("Route" in L) {
                     var routeLayer = new L.Route(options.busRoutes ? data.busRoutes : emptyFeatureCollection, data.busStops, {
                         routeOptions: {
                             onEachFeature: function(feature, layer) {
@@ -494,7 +494,7 @@ SELECT * WHERE {\
                     });
                     routeLayer.addTo(map);
 
-                    if (options.busRouteControl) {
+                    if (options.busRoutes && options.busRouteControl) {
                         var routeControl = new L.Control.Route(routeLayer, "sidebar", {
                             routeMasterSort: function(a, b) {
                                 var refs = {
