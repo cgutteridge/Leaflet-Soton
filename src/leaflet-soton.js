@@ -821,15 +821,9 @@ SELECT * WHERE {\
                                                map,
                                                function() { map.closeInfo(); });
 
-                    var temp = { _rings: building.geometry.coordinates, _map: this };
+                    map.panTo(building.properties.center);
 
-
-                    var center = building.geometry.coordinates[0][0];
-                    center = [center[1], center[0]];
-
-                    map.panTo(center);
-
-                    map.showInfo(content, center);
+                    map.showInfo(content, building.properties.center);
 
                     return;
                 }
