@@ -214,10 +214,13 @@ SELECT * WHERE {\
                     url: 'http://sparql.data.southampton.ac.uk/?query=' + encodeURIComponent(query)
                 },
                 function(data) {
-                    // Only report no data if fetching data failed, and there
-                    // is no local data
-                    if (data === null && LS.workstationData === null) {
-                        LS.fire("workstationData", null);
+                    // If fetching data has failed
+                    if (data === null) {
+                        // Only report this if there is no existing data
+                        if (LS.workstationData === null) {
+                            LS.fire("workstationData", null);
+                        }
+
                         return;
                     }
 
