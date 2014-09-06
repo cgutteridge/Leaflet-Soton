@@ -882,6 +882,68 @@ SELECT * WHERE {\
                 throw "unable to handle " + feature.geometry.type;
             }
         },
+        panByURI: function(uri) {
+            var feature = LS.getFeatureByURI(uri);
+
+            if (feature === null) {
+                throw "can't find " + uri;
+            }
+
+            if (!("geometry" in feature)) {
+                throw "no location for " + uri;
+            }
+
+            if (feature.geometry.type === "Polygon") {
+                console.log(feature);
+
+                var center;
+                if ("center" in feature.properties) {
+                    center = feature.properties.center;
+                } else {
+                    center = feature.geometry.coordinates[0][0];
+                    center = [center[1], center[0]];
+                }
+
+                this.panTo(center);
+
+                if ("level" in feature.properties) {
+                    if (L.Util.isArray(feature.properties.level)) {
+                        this.setLevel(feature.properties.level[0]);
+                    } else {
+                        this.setLevel(feature.properties.level);
+                    }
+                }
+
+                this.closePopup();
+
+                return;
+            } else if (feature.geometry.type === "Point") {
+                this.panTo(L.GeoJSON.coordsToLatLng(feature.geometry.coordinates));
+
+                if ("level" in feature.properties) {
+                    if (L.Util.isArray(feature.properties.level)) {
+                        this.setLevel(feature.properties.level[0]);
+                    } else {
+                        this.setLevel(feature.properties.level);
+                    }
+                } else {
+                    // If this is a workstation
+                    if (uri.indexOf("http://id.southampton.ac.uk/point-of-service/workstations") === 0) {
+                        var room = LS.getRoomFor(uri);
+
+                        if (room !== null) {
+                            this.setLevel(room.properties.level);
+                        }
+                    }
+                }
+
+                this.closePopup();
+                return;
+            } else {
+                throw "unable to handle " + feature.geometry.type;
+            }
+
+        },
         showInfo: function(content, latlng, options) {
             options = options || {};
 
