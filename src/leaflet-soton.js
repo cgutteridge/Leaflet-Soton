@@ -8,6 +8,9 @@
         data: null,
         _dataFetchInProgress: false,
         workstationData: null,
+        updateWorkstationData: true,
+        _updatingWorkstationData: false,
+        workstationDataUpdateTime: 30000,
         _workstationDataFetchInProgress: false,
 
         getData: function(callback) {
@@ -36,12 +39,22 @@
             }
         },
         getWorkstationData: function(callback) {
-            if (this.workstationData !== null) { // TODO: Some kind of periodic refresh
+            if (this.workstationData !== null) {
                 callback(this.workstationData);
             } else {
                 this.addOneTimeEventListener("workstationData", callback);
+
                 if (!this._workstationDataFetchInProgress) {
-                    this._workstationDataFetchInProgress = true;
+                    if (!this._updatingWorkstationData) {
+                        LS.on("workstationData", function(data) {
+                            setTimeout(function() {
+                                LS._workstationdatafetchinprogress = true;
+                                LS._updateWorkstationData();
+                            }, LS.workstationDataUpdateTime);
+                        });
+                    }
+
+                    this._workstationdatafetchinprogress = true;
                     this._updateWorkstationData();
                 }
             }
@@ -201,12 +214,14 @@ SELECT * WHERE {\
                     url: 'http://sparql.data.southampton.ac.uk/?query=' + encodeURIComponent(query)
                 },
                 function(data) {
-                    LS.workstationData = {};
-
-                    if (data === null) {
+                    // Only report no data if fetching data failed, and there
+                    // is no local data
+                    if (data === null && LS.workstationData === null) {
                         LS.fire("workstationData", null);
                         return;
                     }
+
+                    LS.workstationData = {};
 
                     data.results.bindings.forEach(function(result) {
                         var workstation = result.uri.value;
@@ -714,6 +729,12 @@ SELECT * WHERE {\
                     var workstationMarkerLayer;
                     if (options.workstations) {
                         workstationMarkerLayer = LS.workstationLayer();
+
+                        LS.on("workstationData", function(data) {
+                            map.removeLayer(workstationMarkerLayer);
+                            workstationMarkerLayer = LS.workstationLayer();
+                            map.addLayer(workstationMarkerLayer);
+                        });
                     }
 
                     if (options.indoor) {
