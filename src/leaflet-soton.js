@@ -19,8 +19,16 @@
                 if (!this._dataFetchInProgress) {
                     this._dataFetchInProgress = true;
                     getJSON({url: LS.dataPath, cache: false} , function(data) {
-                        LS.data = data;
                         LS._dataFetchInProgress = false;
+
+                        if (data === null) {
+                            setTimeout(function() {
+                                LS.getData(callback);
+                            }, 1000);
+                            return;
+                        }
+
+                        LS.data = data;
 
                         LS.fire("dataload", data);
                     });
@@ -1609,7 +1617,7 @@ SELECT * WHERE {\
         xhttp.ontimeout = function () {
             callback(null);
         };
-        xhttp.timeout = 2000;
+        xhttp.timeout = 3000;
 
         options.data = options.data || null;
 
