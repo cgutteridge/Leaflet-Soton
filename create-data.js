@@ -216,7 +216,9 @@ function createCollections(callback) {
         parking: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,\
                  name,access,capacity,"capacity:disabled",fee from uni_parking',
         bicycleParking: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,capacity,bicycle_parking,covered from uni_bicycle_parking',
-        sites: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,name,loc_ref,uri from uni_site',
+        sites: 'select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,\
+               ST_AsText(ST_Transform(ST_Centroid(way), 4326)) as center,\
+               name,loc_ref,uri from uni_site',
         pointsOfService: "select ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon,ST_AsText(ST_Transform(ST_Centroid(way), 4326)) as center,name,shop,amenity,uri from planet_osm_polygon where (amenity in ('cafe', 'bar', 'restaurant') or shop in ('kiosk', 'convenience')) and ST_Contains((select ST_Union(way) from uni_site), way);"
     };
 
