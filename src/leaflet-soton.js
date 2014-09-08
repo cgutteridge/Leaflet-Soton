@@ -5,13 +5,15 @@
 
         dataPath: 'data.json',
         imagePath: 'images/',
+
         data: null,
         _dataFetchInProgress: false,
+
         workstationData: null,
-        updateWorkstationData: true,
-        _updatingWorkstationData: false,
-        workstationDataUpdateTime: 30000,
+        updateWorkstationData: true, // regularly poll for workstation data
+        workstationDataUpdateTime: 30000, // time to wait between requests
         _workstationDataFetchInProgress: false,
+        _workstationDataFetchTimeout: null,
 
         getData: function(callback) {
             if (this.data !== null) {
@@ -44,19 +46,13 @@
             } else {
                 this.addOneTimeEventListener("workstationData", callback);
 
-                if (!this._workstationDataFetchInProgress) {
-                    if (!this._updatingWorkstationData) {
-                        LS.on("workstationData", function(data) {
-                            setTimeout(function() {
-                                LS._workstationdatafetchinprogress = true;
-                                LS._updateWorkstationData();
-                            }, LS.workstationDataUpdateTime);
-                        });
-                    }
-
-                    this._workstationdatafetchinprogress = true;
-                    this._updateWorkstationData();
+                if (this._workstationDataFetchTimeout !== null || // if a fetch is going to happen
+                    this._workstationDataFetchInProgress) { // or a fetch is in progress
+                    // data will be fetched, so return
+                    return;
                 }
+
+                this._updateWorkstationData();
             }
         },
         getRoomFor: function(uri) {
@@ -181,6 +177,8 @@
             return layer;
         },
         _updateWorkstationData: function() {
+            this._workstationDataFetchInProgress = true;
+
             var query;
 
             if (this.data.workstations.features.length > 10) {
@@ -214,6 +212,8 @@ SELECT * WHERE {\
                     url: 'http://sparql.data.southampton.ac.uk/?query=' + encodeURIComponent(query)
                 },
                 function(data) {
+                    LS._workstationDataFetchInProgress = false;
+
                     // If fetching data has failed
                     if (data === null) {
                         // Only report this if there is no existing data
@@ -238,13 +238,20 @@ SELECT * WHERE {\
                         LS.workstationData[workstation] = obj;
                     });
 
-                    LS._workstationDataFetchInProgress = false;
-
                     LS.fire("workstationData", LS.workstationData);
                 }
             );
         }
     });
+
+    if (LS.updateWorkstationData) {
+        LS.on("workstationData", function(data) {
+            LS._workstationDataFetchTimeout = setTimeout(function() {
+                LS._workstationDataFetchTimeout = null;
+                LS._updateWorkstationData();
+            }, LS.workstationDataUpdateTime);
+        });
+    }
 
     var busRouteColours = {};
 
