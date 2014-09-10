@@ -114,6 +114,7 @@
                         }
 
                         var entrance = entrances[entrance_id];
+                        console.log(entrance);
                         if ("geometry" in entrance) {
                             return L.GeoJSON.coordsToLatLng(entrance.geometry.coordinates);
                         } else {
@@ -194,30 +195,28 @@
                          }
                         addToTable(comment);
 
-                        var a = document.createElement("a");
-                        a.textContent = "Show";
-                        a.href = "#";
+                        var coordinates = entranceLocations[index];
+                        if (coordinates === null) {
+                            addToTable(document.createTextNode("No Location"));
+                        } else {
+                            var a = document.createElement("a");
+                            a.textContent = "Show";
+                            a.href = "#";
 
-                        // when the entrance is clicked
-                        a.onclick = function() {
-                            var coordinates = entranceLocations[index];
+                            // when the entrance is clicked
+                            a.onclick = function() {
+                                // pan to the entrance
+                                map.panTo(coordinates);
 
-                            if (coordinates === null) {
-                                return;
-                            }
+                                if ("level" in entrance.properties) {
+                                    // display the relevant level
+                                    map.setLevel(entrance.properties.level);
+                                }
 
-                            // pan to the entrance
-                            map.panTo(coordinates);
-
-                            if ("level" in entrance.properties) {
-                                // display the relevant level
-                                map.setLevel(entrance.properties.level);
-                            }
-
-                            return false;
-                        };
-
-                        addToTable(a);
+                                return false;
+                            };
+                            addToTable(a);
+                        }
 
                         tbody.appendChild(tr);
                     });

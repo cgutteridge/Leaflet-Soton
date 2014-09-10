@@ -660,17 +660,23 @@ function createBuildingParts(buildings, callback) {
 
                     portal.buildingpart = "entrance";
 
-                    buildingParts.push({
+                    var portalObj = {
                         type: "Feature",
-                        geometry: {
+
+                        properties: portal
+                    };
+
+                    if ("lat" in portal && "lon" in portal) {
+                        portalObj.geometry = {
                             type: "Point",
                             coordinates: [
                                 parseFloat(portal.lon, 10),
                                 parseFloat(portal.lat, 10)
                             ]
-                        },
-                        properties: portal
-                    });
+                        };
+                    }
+
+                    buildingParts.push(portalObj);
 
                     buildingProperties = building.properties;
                     if (!("entrances" in buildingProperties)) {
@@ -1066,11 +1072,11 @@ PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>\
 SELECT * WHERE {\
     ?portal a portals:BuildingEntrance;\
             portals:connectsBuilding ?building;\
-            rdfs:comment ?comment;\
-            rdfs:label ?label;\
-            geo:lat ?lat;\
-            geo:long ?long;\
     OPTIONAL {\
+        ?portal rdfs:comment ?comment .\
+        ?portal rdfs:label ?label .\
+        ?portal geo:lat ?lat .\
+        ?portal geo:long ?long .\
         ?portal portals:connectsFloor ?floor\
     }\
 }"
@@ -1095,14 +1101,26 @@ SELECT * WHERE {\
             var obj = {
                 uri: portal.portal.value,
                 building: portal.building.value,
-                label: portal.label.value,
-                comment: portal.comment.value,
-                lat: portal.lat.value,
-                lon: portal.long.value
             }
 
             if ("floor" in portal) {
                 obj.floor = portal.floor.value;
+            }
+
+            if ("label" in portal) {
+                obj.label = portal.label.value;
+            }
+
+            if ("comment" in portal) {
+                obj.comment = portal.comment.value;
+            }
+
+            if ("lat" in portal) {
+                obj.lat = portal.lat.value;
+            }
+
+            if ("long" in portal) {
+                obj.lon = portal.long.value;
             }
 
             portals.push(obj);
