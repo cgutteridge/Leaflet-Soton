@@ -321,6 +321,9 @@ function processBuildingParts(buildingParts, callback) {
                         findRoomContents(part, workstations, callback);
                     },
                     function(callback) {
+                        getRecommendedEntrances(part, callback);
+                    },
+                    function(callback) {
                         findRoomImages(part, callback);
                     }],
                 callback);
@@ -1124,6 +1127,43 @@ SELECT * WHERE {\
             }
 
             portals.push(obj);
+        });
+
+        callback(null, portals);
+    });
+}
+
+function getRecommendedEntrances(part, callback) {
+    var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
+        PREFIX portals: <http://purl.org/openorg/portals/>\
+        PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>\
+        SELECT ?portal WHERE {\
+            ?uri portals:recommendedBuildingEntrance ?portal\
+                FILTER (\
+                        ?uri = <URI>\
+                       )\
+        }";
+
+    query = query.replace("URI", part.properties.uri);
+
+    sparqlQuery(query, function(err, data) {
+        if (err) {
+            console.error("error in getRecommended Entrance");
+            console.error("query " + query);
+            console.error(err);
+        }
+
+        part.properties.recommendedEntrances = portals = [];
+
+        data.results.bindings.forEach(function(portal) {
+            if ('error-message' in portal) {
+                console.error("error in portals");
+                console.error(JSON.stringify(feature));
+                console.error("query:\n" + query);
+                return;
+            }
+
+            portals.push(portal.portal.value);
         });
 
         callback(null, portals);

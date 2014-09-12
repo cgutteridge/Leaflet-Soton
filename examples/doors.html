@@ -70,11 +70,16 @@
             });
 
             var buildingRooms = {};
+            var roomsByUri = {};
 
             // Find the building rooms (probably something that the library
             // should help with, but it does not (yet)
             data.buildingParts.features.forEach(function(part) {
                 if (part.properties.buildingpart === "room") {
+
+                    if ("uri" in part.properties) {
+                        roomsByUri[part.properties.uri] = part;
+                    }
                     if (!("building" in part.properties)) {
                         console.log("unknown building");
                         console.log(part);
@@ -91,6 +96,8 @@
                 }
             });
 
+            console.log("roomsByUri");
+            console.log(roomsByUri);
 
             data.buildings.features.forEach(function(building) {
                 // if the building has some entrances in the data
@@ -221,9 +228,37 @@
                         tbody.appendChild(tr);
                     });
 
+
                     table.appendChild(tbody);
                     div.appendChild(table);
                 }
+
+                var ul = document.createElement("ul");
+                for(var level in building.properties.rooms) {
+                    var rooms = building.properties.rooms[level];
+                    rooms.forEach(function(room) {
+                        var li = document.createElement("li");
+                        li.textContent = room;
+
+                        if (room in roomsByUri) {
+                            var roomPart = roomsByUri[room];
+                            var nested_ul = document.createElement("ul");
+                            roomPart.properties.recommendedEntrances.forEach(function(entrance) {
+                                console.log("entrance");
+                                console.log(entrance);
+                                var nested_li = document.createElement("li");
+                                nested_li.textContent = entrance;
+                                nested_ul.appendChild(nested_li);
+                            });
+                            li.appendChild(nested_ul);
+                        } else {
+                            // dont know location
+                        }
+
+                        ul.appendChild(li);
+                    });
+                }
+                div.appendChild(ul);
             });
         });
 
