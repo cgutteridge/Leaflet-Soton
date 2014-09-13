@@ -1072,14 +1072,20 @@ function getPortals(callback) {
     var query = "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\
 PREFIX portals: <http://purl.org/openorg/portals/>\
 PREFIX geo: <http://www.w3.org/2003/01/geo/wgs84_pos#>\
-SELECT * WHERE {\
+SELECT DISTINCT * WHERE {\
     ?portal a portals:BuildingEntrance;\
             portals:connectsBuilding ?building;\
     OPTIONAL {\
         ?portal rdfs:comment ?comment .\
+    }\
+    OPTIONAL {\
         ?portal rdfs:label ?label .\
+    }\
+    OPTIONAL {\
         ?portal geo:lat ?lat .\
         ?portal geo:long ?long .\
+    }\
+    OPTIONAL {\
         ?portal portals:connectsFloor ?floor\
     }\
 }"
