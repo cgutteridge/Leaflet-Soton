@@ -100,12 +100,13 @@
             console.log(roomsByUri);
 
             data.buildings.features.forEach(function(building) {
+                var title = document.createElement("h2");
+                title.textContent = building.properties.name;
+
+                div.appendChild(title);
+
                 // if the building has some entrances in the data
                 if ("entrances" in building.properties) {
-
-                    var title = document.createElement("h2");
-                    title.textContent = building.properties.name;
-
                     if (building.properties.uri in buildingRooms) {
                         var rooms = buildingRooms[building.properties.uri];
 
@@ -128,8 +129,6 @@
                             return null;
                         }
                     });
-
-                    div.appendChild(title);
 
                     // create the list of entrances
                     var table = document.createElement("table");
