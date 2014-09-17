@@ -115,108 +115,110 @@ body { height: 100%; margin: 0px; padding: 0px }
     LS.imagePath = '../resources/images/';
     LS.dataPath = '../data.json';
 
-    var map = LS.map('map', {
-        indoor: true
-    });
-
-    LS.on("dataload", function(data) {
-
-        var buildingsByRef = {};
-        var buildingRoomsByRef = {};
-
-        data.buildings.features.forEach(function(building) {
-            if ("loc_ref" in building.properties) {
-                buildingsByRef[building.properties.loc_ref] = building;
-            }
+    (function() {
+        var map = LS.map('map', {
+            indoor: true
         });
 
-        data.buildingParts.features.forEach(function(part) {
-            if (part.properties.buildingPart === "room" && "ref" in part.properties) {
-                buildingRoomsByRef[part.properties.ref] = part;
-            }
-        });
+        LS.on("dataload", function(data) {
 
-        function matchSlashSeperated(searchText) {
+            var buildingsByRef = {};
+            var buildingRoomsByRef = {};
 
-            var parts = searchText.split("/");
+            data.buildings.features.forEach(function(building) {
+                if ("loc_ref" in building.properties) {
+                    buildingsByRef[building.properties.loc_ref] = building;
+                }
+            });
 
-            if (parts.length !== 2)
-                return null;
+            data.buildingParts.features.forEach(function(part) {
+                if (part.properties.buildingPart === "room" && "ref" in part.properties) {
+                    buildingRoomsByRef[part.properties.ref] = part;
+                }
+            });
 
-            var building = parts[0].trim();
-            var room = parts[1].trim();
+            function matchSlashSeperated(searchText) {
 
-            if (building in buildingsByRef) {
-                if (room in buildingRoomsByRef[building]) {
-                    return buildingsRoomsByRef[building][room];
+                var parts = searchText.split("/");
+
+                if (parts.length !== 2)
+                    return null;
+
+                var building = parts[0].trim();
+                var room = parts[1].trim();
+
+                if (building in buildingsByRef) {
+                    if (room in buildingRoomsByRef[building]) {
+                        return buildingsRoomsByRef[building][room];
+                    } else {
+                        return buildingsByRef[building];
+                    }
                 } else {
-                    return buildingsByRef[building];
+                    return null;
                 }
-            } else {
-                return null;
             }
-        }
 
-        var searchBox = document.getElementById("searchBox");
-        var residentialTickBox = document.getElementById("res");
-        var resultsDiv = document.getElementById("resultsDiv");
+            var searchBox = document.getElementById("searchBox");
+            var residentialTickBox = document.getElementById("res");
+            var resultsDiv = document.getElementById("resultsDiv");
 
-        var buildings = data.buildings.features.sort(function(a, b) {
-            return a.properties.name.localeCompare(b.properties.name);
+            var buildings = data.buildings.features.sort(function(a, b) {
+                return a.properties.name.localeCompare(b.properties.name);
+            });
+
+            function filter() {
+                var searchText = searchBox.value.toLowerCase();
+
+                resultsDiv.innerHTML = "";
+
+                var matchingBuildings = [];
+                var matchingBuildingRooms = {};
+
+                buildings.forEach(function(building) {
+                    var name = building.properties.name;
+                    var loc_ref = building.properties.loc_ref;
+
+                    if (name.length === 0)
+                        return;
+
+                    if (name.toLowerCase().indexOf(searchText) !== -1 ||
+                        loc_ref.indexOf(searchText) !== -1) {
+
+                        matchingBuildings.push(building);
+                    }
+                });
+
+                matchingBuildings.forEach(function(building) {
+                    var a = document.createElement("a");
+                    a.href = "#";
+
+                    a.onclick = function() {
+                        map.showPopupByURI(building.properties.uri);
+                    };
+
+                    var label = document.createElement("span");
+                    label.textContent = building.properties.name;
+                    label.className = "label";
+                    a.appendChild(label);
+
+                    var n = document.createElement("span");
+                    n.textContent = building.properties.loc_ref;
+                    n.className = "n";
+                    a.appendChild(n);
+
+                    resultsDiv.appendChild(a);
+                });
+
+                /*if (results.length === 1) {
+                    map.showPopupByURI(results[0]);
+                }*/
+            }
+
+            searchBox.onkeyup = filter;
+
+            filter();
         });
-
-        function filter() {
-            var searchText = searchBox.value.toLowerCase();
-
-            resultsDiv.innerHTML = "";
-
-            var matchingBuildings = [];
-            var matchingBuildingRooms = {};
-
-            buildings.forEach(function(building) {
-                var name = building.properties.name;
-                var loc_ref = building.properties.loc_ref;
-
-                if (name.length === 0)
-                    return;
-
-                if (name.toLowerCase().indexOf(searchText) !== -1 ||
-                    loc_ref.indexOf(searchText) !== -1) {
-
-                    matchingBuildings.push(building);
-                }
-            });
-
-            matchingBuildings.forEach(function(building) {
-                var a = document.createElement("a");
-                a.href = "#";
-
-                a.onclick = function() {
-                    map.showPopupByURI(building.properties.uri);
-                };
-
-                var label = document.createElement("span");
-                label.textContent = building.properties.name;
-                label.className = "label";
-                a.appendChild(label);
-
-                var n = document.createElement("span");
-                n.textContent = building.properties.loc_ref;
-                n.className = "n";
-                a.appendChild(n);
-
-                resultsDiv.appendChild(a);
-            });
-
-            /*if (results.length === 1) {
-                map.showPopupByURI(results[0]);
-            }*/
-        }
-
-        searchBox.onkeyup = filter;
-
-        filter();
-    });
+    })();
 </script>
 </body>
 </html>

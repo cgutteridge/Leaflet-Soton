@@ -32,14 +32,16 @@
         LS.imagePath = '../resources/images/';
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map', {
-            indoor: true,
-            zoom: 20,
-            center: [50.93732, -1.39774],
-            highlight: {
-              "http://id.southampton.ac.uk/building/59": true
-            }
-        });
+        (function() {
+            var map = LS.map('map', {
+                indoor: true,
+                zoom: 20,
+                center: [50.93732, -1.39774],
+                highlight: {
+                  "http://id.southampton.ac.uk/building/59": true
+                }
+            });
+        })();
     </script>
 </body>
 </html>

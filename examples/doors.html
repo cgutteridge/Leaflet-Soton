@@ -45,223 +45,225 @@
         LS.imagePath = '../resources/images/';
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map', {
-            workstations: true,
-            indoor: true,
-            zoom: 20
-        });
-
-        var div = document.getElementById("data");
-
-        LS.getData(function(data) {
-            // first index the entrances, as they cannot be looked up easily,
-            // as they do not have uri's
-            var entrances = {};
-            data.buildingParts.features.forEach(function(part) {
-                if (part.properties.buildingpart === "entrance") {
-                    if ("uri" in part.properties) {
-                        entrances[part.properties.uri] = part;
-                    }
-
-                    if ("id" in part) {
-                        entrances[part.id] = part;
-                    }
-                }
+        (function() {
+            var map = LS.map('map', {
+                workstations: true,
+                indoor: true,
+                zoom: 20
             });
 
-            var buildingRooms = {};
-            var roomsByUri = {};
+            var div = document.getElementById("data");
 
-            // Find the building rooms (probably something that the library
-            // should help with, but it does not (yet)
-            data.buildingParts.features.forEach(function(part) {
-                if (part.properties.buildingpart === "room") {
+            LS.getData(function(data) {
+                // first index the entrances, as they cannot be looked up easily,
+                // as they do not have uri's
+                var entrances = {};
+                data.buildingParts.features.forEach(function(part) {
+                    if (part.properties.buildingpart === "entrance") {
+                        if ("uri" in part.properties) {
+                            entrances[part.properties.uri] = part;
+                        }
 
-                    if ("uri" in part.properties) {
-                        roomsByUri[part.properties.uri] = part;
+                        if ("id" in part) {
+                            entrances[part.id] = part;
+                        }
                     }
-                    if (!("building" in part.properties)) {
-                        console.log("unknown building");
-                        console.log(part);
-                        return;
+                });
+
+                var buildingRooms = {};
+                var roomsByUri = {};
+
+                // Find the building rooms (probably something that the library
+                // should help with, but it does not (yet)
+                data.buildingParts.features.forEach(function(part) {
+                    if (part.properties.buildingpart === "room") {
+
+                        if ("uri" in part.properties) {
+                            roomsByUri[part.properties.uri] = part;
+                        }
+                        if (!("building" in part.properties)) {
+                            console.log("unknown building");
+                            console.log(part);
+                            return;
+                        }
+
+                        var building = part.properties.building;
+
+                        if (building in buildingRooms) {
+                            buildingRooms[building].push(part);
+                        } else {
+                            buildingRooms[building] = [ part ];
+                        }
+                    }
+                });
+
+                console.log("roomsByUri");
+                console.log(roomsByUri);
+
+                data.buildings.features.forEach(function(building) {
+                    var title = document.createElement("h2");
+                    title.textContent = building.properties.name;
+
+                    div.appendChild(title);
+
+                    // if the building has some entrances in the data
+                    if ("entrances" in building.properties) {
+                        if (building.properties.uri in buildingRooms) {
+                            var rooms = buildingRooms[building.properties.uri];
+
+                            var roomLocations = rooms.map(function(room) {
+                                return L.GeoJSON.coordsToLatLng(room.properties.center);
+                            });
+                        }
+
+                        var entranceLocations = building.properties.entrances.map(function(entrance_id) {
+                            if (!(entrance_id in entrances)) {
+                                console.warn("cannot find entrance " + entrance_id);
+                                return;
+                            }
+
+                            var entrance = entrances[entrance_id];
+                            console.log(entrance);
+                            if ("geometry" in entrance) {
+                                return L.GeoJSON.coordsToLatLng(entrance.geometry.coordinates);
+                            } else {
+                                return null;
+                            }
+                        });
+
+                        // create the list of entrances
+                        var table = document.createElement("table");
+                        var thead = document.createElement("thead");
+
+                        var headTr = document.createElement("tr");
+
+                        function addTh(e) {
+                            var th = document.createElement("th");
+                            th.appendChild(e);
+                            headTr.appendChild(th);
+                        }
+
+                        addTh(document.createTextNode("OSM ID"));
+                        addTh(document.createTextNode("URI"));
+                        addTh(document.createTextNode("Label"));
+                        addTh(document.createTextNode("Comment"));
+                        addTh(document.createTextNode("")); // for Show
+
+                        thead.appendChild(headTr);
+                        table.appendChild(thead);
+
+                        var tbody = document.createElement("tbody");
+
+                        building.properties.entrances.forEach(function(entrance_id, index) {
+                            if (!(entrance_id in entrances)) {
+                                console.warn("cannot find entrance " + entrance_id);
+                                return;
+                            }
+
+                            var tr = document.createElement("tr");
+
+                            function addToTable(e) {
+                                var td = document.createElement("td");
+                                td.appendChild(e);
+                                tr.appendChild(td);
+                            }
+
+                            var entrance = entrances[entrance_id];
+
+                            var osmId;
+                            if ("id" in entrance) {
+                                osmId = document.createTextNode(entrance.id);
+                            } else {
+                                osmId = document.createTextNode("Unknown");
+                            }
+                            addToTable(osmId);
+
+                            var uri;
+                            if ("uri" in entrance.properties) {
+                                uri = document.createTextNode(entrance.properties.uri);
+                            } else {
+                                uri = document.createTextNode("Unknown");
+                             }
+                            addToTable(uri);
+
+                            var label;
+                            if ("label" in entrance.properties) {
+                                label = document.createTextNode(entrance.properties.label);
+                            } else {
+                                label = document.createTextNode("Unknown");
+                             }
+                            addToTable(label);
+
+                            var comment;
+                            if ("comment" in entrance.properties) {
+                                comment = document.createTextNode(entrance.properties.comment);
+                            } else {
+                                comment = document.createTextNode("Unknown");
+                             }
+                            addToTable(comment);
+
+                            var coordinates = entranceLocations[index];
+                            if (coordinates === null) {
+                                addToTable(document.createTextNode("No Location"));
+                            } else {
+                                var a = document.createElement("a");
+                                a.textContent = "Show";
+                                a.href = "#";
+
+                                // when the entrance is clicked
+                                a.onclick = function() {
+                                    // pan to the entrance
+                                    map.panTo(coordinates);
+
+                                    if ("level" in entrance.properties) {
+                                        // display the relevant level
+                                        map.setLevel(entrance.properties.level);
+                                    }
+
+                                    return false;
+                                };
+                                addToTable(a);
+                            }
+
+                            tbody.appendChild(tr);
+                        });
+
+
+                        table.appendChild(tbody);
+                        div.appendChild(table);
                     }
 
-                    var building = part.properties.building;
+                    var ul = document.createElement("ul");
+                    for(var level in building.properties.rooms) {
+                        var rooms = building.properties.rooms[level];
+                        rooms.forEach(function(room) {
+                            var li = document.createElement("li");
+                            li.textContent = room;
 
-                    if (building in buildingRooms) {
-                        buildingRooms[building].push(part);
-                    } else {
-                        buildingRooms[building] = [ part ];
-                    }
-                }
-            });
+                            if (room in roomsByUri) {
+                                var roomPart = roomsByUri[room];
+                                var nested_ul = document.createElement("ul");
+                                roomPart.properties.recommendedEntrances.forEach(function(entrance) {
+                                    console.log("entrance");
+                                    console.log(entrance);
+                                    var nested_li = document.createElement("li");
+                                    nested_li.textContent = entrance;
+                                    nested_ul.appendChild(nested_li);
+                                });
+                                li.appendChild(nested_ul);
+                            } else {
+                                // dont know location
+                            }
 
-            console.log("roomsByUri");
-            console.log(roomsByUri);
-
-            data.buildings.features.forEach(function(building) {
-                var title = document.createElement("h2");
-                title.textContent = building.properties.name;
-
-                div.appendChild(title);
-
-                // if the building has some entrances in the data
-                if ("entrances" in building.properties) {
-                    if (building.properties.uri in buildingRooms) {
-                        var rooms = buildingRooms[building.properties.uri];
-
-                        var roomLocations = rooms.map(function(room) {
-                            return L.GeoJSON.coordsToLatLng(room.properties.center);
+                            ul.appendChild(li);
                         });
                     }
-
-                    var entranceLocations = building.properties.entrances.map(function(entrance_id) {
-                        if (!(entrance_id in entrances)) {
-                            console.warn("cannot find entrance " + entrance_id);
-                            return;
-                        }
-
-                        var entrance = entrances[entrance_id];
-                        console.log(entrance);
-                        if ("geometry" in entrance) {
-                            return L.GeoJSON.coordsToLatLng(entrance.geometry.coordinates);
-                        } else {
-                            return null;
-                        }
-                    });
-
-                    // create the list of entrances
-                    var table = document.createElement("table");
-                    var thead = document.createElement("thead");
-
-                    var headTr = document.createElement("tr");
-
-                    function addTh(e) {
-                        var th = document.createElement("th");
-                        th.appendChild(e);
-                        headTr.appendChild(th);
-                    }
-
-                    addTh(document.createTextNode("OSM ID"));
-                    addTh(document.createTextNode("URI"));
-                    addTh(document.createTextNode("Label"));
-                    addTh(document.createTextNode("Comment"));
-                    addTh(document.createTextNode("")); // for Show
-
-                    thead.appendChild(headTr);
-                    table.appendChild(thead);
-
-                    var tbody = document.createElement("tbody");
-
-                    building.properties.entrances.forEach(function(entrance_id, index) {
-                        if (!(entrance_id in entrances)) {
-                            console.warn("cannot find entrance " + entrance_id);
-                            return;
-                        }
-
-                        var tr = document.createElement("tr");
-
-                        function addToTable(e) {
-                            var td = document.createElement("td");
-                            td.appendChild(e);
-                            tr.appendChild(td);
-                        }
-
-                        var entrance = entrances[entrance_id];
-
-                        var osmId;
-                        if ("id" in entrance) {
-                            osmId = document.createTextNode(entrance.id);
-                        } else {
-                            osmId = document.createTextNode("Unknown");
-                        }
-                        addToTable(osmId);
-
-                        var uri;
-                        if ("uri" in entrance.properties) {
-                            uri = document.createTextNode(entrance.properties.uri);
-                        } else {
-                            uri = document.createTextNode("Unknown");
-                         }
-                        addToTable(uri);
-
-                        var label;
-                        if ("label" in entrance.properties) {
-                            label = document.createTextNode(entrance.properties.label);
-                        } else {
-                            label = document.createTextNode("Unknown");
-                         }
-                        addToTable(label);
-
-                        var comment;
-                        if ("comment" in entrance.properties) {
-                            comment = document.createTextNode(entrance.properties.comment);
-                        } else {
-                            comment = document.createTextNode("Unknown");
-                         }
-                        addToTable(comment);
-
-                        var coordinates = entranceLocations[index];
-                        if (coordinates === null) {
-                            addToTable(document.createTextNode("No Location"));
-                        } else {
-                            var a = document.createElement("a");
-                            a.textContent = "Show";
-                            a.href = "#";
-
-                            // when the entrance is clicked
-                            a.onclick = function() {
-                                // pan to the entrance
-                                map.panTo(coordinates);
-
-                                if ("level" in entrance.properties) {
-                                    // display the relevant level
-                                    map.setLevel(entrance.properties.level);
-                                }
-
-                                return false;
-                            };
-                            addToTable(a);
-                        }
-
-                        tbody.appendChild(tr);
-                    });
-
-
-                    table.appendChild(tbody);
-                    div.appendChild(table);
-                }
-
-                var ul = document.createElement("ul");
-                for(var level in building.properties.rooms) {
-                    var rooms = building.properties.rooms[level];
-                    rooms.forEach(function(room) {
-                        var li = document.createElement("li");
-                        li.textContent = room;
-
-                        if (room in roomsByUri) {
-                            var roomPart = roomsByUri[room];
-                            var nested_ul = document.createElement("ul");
-                            roomPart.properties.recommendedEntrances.forEach(function(entrance) {
-                                console.log("entrance");
-                                console.log(entrance);
-                                var nested_li = document.createElement("li");
-                                nested_li.textContent = entrance;
-                                nested_ul.appendChild(nested_li);
-                            });
-                            li.appendChild(nested_ul);
-                        } else {
-                            // dont know location
-                        }
-
-                        ul.appendChild(li);
-                    });
-                }
-                div.appendChild(ul);
+                    div.appendChild(ul);
+                });
             });
-        });
 
-        L.control.locate().addTo(map);
+            L.control.locate().addTo(map);
+        })();
     </script>
 </body>
 </html>

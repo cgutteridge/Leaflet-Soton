@@ -31,46 +31,48 @@
         LS.imagePath = '../resources/images/';
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map', {
-            indoor: false,
-        });
-
-        LS.getData(function(data) {
-            var heatmapData = [];
-
-            console.log(data);
-
-            data.bicycleParking.features.forEach(function(feature) {
-                var lat,
-                    lon;
-
-                if (feature.geometry.type === "Point") {
-                    lat = feature.geometry.coordinates[1];
-                    lon = feature.geometry.coordinates[0];
-                } else if (feature.geometry.type === "Polygon") {
-                    lat = feature.geometry.coordinates[0][0][1];
-                    lon = feature.geometry.coordinates[0][0][0];
-                }
-
-                if ("capacity" in feature.properties) {
-                    for (var i=0; i<feature.properties.capacity; i++) {
-                        heatmapData.push([lat, lon]);
-                    }
-                } else {
-                    heatmapData.push([lat, lon]);
-                }
+        (function() {
+            var map = LS.map('map', {
+                indoor: false,
             });
 
-            var heat = L.heatLayer(heatmapData, {
-                radius: 20,
-                blur: 5,
-                gradient: {
-                    0.4: 'green',
-                    0.65: 'lime',
-                    1: 'green'
-                }
-            }).addTo(map);
-        });
+            LS.getData(function(data) {
+                var heatmapData = [];
+
+                console.log(data);
+
+                data.bicycleParking.features.forEach(function(feature) {
+                    var lat,
+                        lon;
+
+                    if (feature.geometry.type === "Point") {
+                        lat = feature.geometry.coordinates[1];
+                        lon = feature.geometry.coordinates[0];
+                    } else if (feature.geometry.type === "Polygon") {
+                        lat = feature.geometry.coordinates[0][0][1];
+                        lon = feature.geometry.coordinates[0][0][0];
+                    }
+
+                    if ("capacity" in feature.properties) {
+                        for (var i=0; i<feature.properties.capacity; i++) {
+                            heatmapData.push([lat, lon]);
+                        }
+                    } else {
+                        heatmapData.push([lat, lon]);
+                    }
+                });
+
+                var heat = L.heatLayer(heatmapData, {
+                    radius: 20,
+                    blur: 5,
+                    gradient: {
+                        0.4: 'green',
+                        0.65: 'lime',
+                        1: 'green'
+                    }
+                }).addTo(map);
+            });
+        })();
     </script>
 </body>
 </html>

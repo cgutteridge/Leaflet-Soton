@@ -118,65 +118,67 @@ body { height: 100%; margin: 0px; padding: 0px }
     LS.imagePath = '../resources/images/';
     LS.dataPath = '../data.json';
 
-    var map = LS.map('map', {
-        indoor: true
-    });
-
-    LS.on("dataload", function(data) {
-        var searchBox = document.getElementById("searchBox");
-        var residentialTickBox = document.getElementById("res");
-        var resultsDiv = document.getElementById("resultsDiv");
-
-        var buildings = data.buildings.features.sort(function(a, b) {
-            return a.properties.name.localeCompare(b.properties.name);
+    (function() {
+        var map = LS.map('map', {
+            indoor: true
         });
 
-        function filter() {
-            var searchText = searchBox.value.toLowerCase();
+        LS.on("dataload", function(data) {
+            var searchBox = document.getElementById("searchBox");
+            var residentialTickBox = document.getElementById("res");
+            var resultsDiv = document.getElementById("resultsDiv");
 
-            resultsDiv.innerHTML = "";
-
-            var results = [];
-
-            buildings.forEach(function(building) {
-                var name = building.properties.name;
-
-                if (name.length === 0)
-                    return;
-
-                if (name.toLowerCase().indexOf(searchText) !== -1) {
-                    var a = document.createElement("a");
-                    a.href = "#";
-
-                    a.onclick = function() {
-                        map.panByURI(building.properties.uri);
-                    };
-
-                    var label = document.createElement("span");
-                    label.textContent = name;
-                    label.className = "label";
-                    a.appendChild(label);
-
-                    var n = document.createElement("span");
-                    n.textContent = building.properties.loc_ref;
-                    n.className = "n";
-                    a.appendChild(n);
-
-                    resultsDiv.appendChild(a);
-
-                    results.push(building.properties.uri);
-                }
+            var buildings = data.buildings.features.sort(function(a, b) {
+                return a.properties.name.localeCompare(b.properties.name);
             });
 
-            if (results.length === 1) {
-                map.showPopupByURI(results[0]);
+            function filter() {
+                var searchText = searchBox.value.toLowerCase();
+
+                resultsDiv.innerHTML = "";
+
+                var results = [];
+
+                buildings.forEach(function(building) {
+                    var name = building.properties.name;
+
+                    if (name.length === 0)
+                        return;
+
+                    if (name.toLowerCase().indexOf(searchText) !== -1) {
+                        var a = document.createElement("a");
+                        a.href = "#";
+
+                        a.onclick = function() {
+                            map.panByURI(building.properties.uri);
+                        };
+
+                        var label = document.createElement("span");
+                        label.textContent = name;
+                        label.className = "label";
+                        a.appendChild(label);
+
+                        var n = document.createElement("span");
+                        n.textContent = building.properties.loc_ref;
+                        n.className = "n";
+                        a.appendChild(n);
+
+                        resultsDiv.appendChild(a);
+
+                        results.push(building.properties.uri);
+                    }
+                });
+
+                if (results.length === 1) {
+                    map.showPopupByURI(results[0]);
+                }
             }
-        }
 
-        searchBox.onkeyup = filter;
+            searchBox.onkeyup = filter;
 
-        filter();
-    });
+            filter();
+        });
+    })();
 </script>
 </body>
 </html>

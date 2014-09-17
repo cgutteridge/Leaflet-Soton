@@ -28,7 +28,9 @@
     <script type="text/javascript">
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map');
+        (function() {
+            var map = LS.map('map');
+        })();
     </script>
 </body>
 </html>

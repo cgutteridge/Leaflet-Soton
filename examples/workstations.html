@@ -31,9 +31,11 @@
         LS.imagePath = '../resources/images/';
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map', {
-            workstations: true
-        });
+        (function() {
+            var map = LS.map('map', {
+                workstations: true
+            });
+        })();
     </script>
 </body>
 </html>

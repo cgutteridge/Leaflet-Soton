@@ -41,12 +41,14 @@
         LS.imagePath = '../resources/images/';
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map', {
-            busRoutes: true,
-            busRouteControl: true
-        });
+        (function() {
+            var map = LS.map('map', {
+                busRoutes: true,
+                busRouteControl: true
+            });
 
-        L.control.locate().addTo(map);
+            L.control.locate().addTo(map);
+        })();
     </script>
 </body>
 </html>

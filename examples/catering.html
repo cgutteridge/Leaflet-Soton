@@ -97,132 +97,134 @@
         LS.imagePath = '../resources/images/';
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map', {
-            indoor: false,
-        });
+        (function() {
+            var map = LS.map('map', {
+                indoor: false,
+            });
 
-        var sidebar = L.control.sidebar('sidebar', {
-            position: 'left'
-        });
+            var sidebar = L.control.sidebar('sidebar', {
+                position: 'left'
+            });
 
-        map.addControl(sidebar);
+            map.addControl(sidebar);
 
-        setTimeout(function () {
-            sidebar.show();
-        }, 500);
+            setTimeout(function () {
+                sidebar.show();
+            }, 500);
 
-        var info = document.getElementById("info");
+            var info = document.getElementById("info");
 
-        map.showInfo = function(content, latlng, options) {
-            info.innerHTML = "";
-            info.appendChild(content);
-            sidebar.show();
-        };
-
-        LS.getData(function(data) { var layer = LS.getPointOfServiceLayer();
-            layer.addTo(map);
-
-            var substringMatcher = function(strs) {
-                return function findMatches(q, cb) {
-                    var matches, substrRegex;
-                    // an array that will be populated with substring matches
-                    matches = [];
-
-                    // regex used to determine if a string contains the substring `q`
-                    substrRegex = new RegExp(q, 'i');
-
-                    // iterate through the pool of strings and for any string that
-                    // contains the substring `q`, add it to the `matches` array
-                    $.each(strs, function(i, str) {
-                        if (substrRegex.test(str)) {
-                            // the typeahead jQuery plugin expects suggestions to a
-                            // JavaScript object, refer to typeahead docs for more info
-                            matches.push({ value: str });
-                        }
-                    });
-
-                cb(matches);
-                };
+            map.showInfo = function(content, latlng, options) {
+                info.innerHTML = "";
+                info.appendChild(content);
+                sidebar.show();
             };
 
-            var itemMap = {};
+            LS.getData(function(data) { var layer = LS.getPointOfServiceLayer();
+                layer.addTo(map);
 
-            data.pointsOfService.features.forEach(function(feature) {
-                if ("offerings" in feature.properties) {
-                    var offerings = feature.properties.offerings;
+                var substringMatcher = function(strs) {
+                    return function findMatches(q, cb) {
+                        var matches, substrRegex;
+                        // an array that will be populated with substring matches
+                        matches = [];
 
-                    var sections = Object.keys(offerings);
+                        // regex used to determine if a string contains the substring `q`
+                        substrRegex = new RegExp(q, 'i');
 
-                    sections.forEach(function(sectionURI) {
-                        var section = offerings[sectionURI];
-
-                        section.items.forEach(function(item) {
-                            var obj = {
-                                uri: item.uri,
-                                feature: feature
-                            };
-
-                            if (item.label in itemMap) {
-                                itemMap[item.label].push(obj);
-                            } else {
-                                itemMap[item.label] = [ obj ];
+                        // iterate through the pool of strings and for any string that
+                        // contains the substring `q`, add it to the `matches` array
+                        $.each(strs, function(i, str) {
+                            if (substrRegex.test(str)) {
+                                // the typeahead jQuery plugin expects suggestions to a
+                                // JavaScript object, refer to typeahead docs for more info
+                                matches.push({ value: str });
                             }
                         });
-                    });
-                }
+
+                    cb(matches);
+                    };
+                };
+
+                var itemMap = {};
+
+                data.pointsOfService.features.forEach(function(feature) {
+                    if ("offerings" in feature.properties) {
+                        var offerings = feature.properties.offerings;
+
+                        var sections = Object.keys(offerings);
+
+                        sections.forEach(function(sectionURI) {
+                            var section = offerings[sectionURI];
+
+                            section.items.forEach(function(item) {
+                                var obj = {
+                                    uri: item.uri,
+                                    feature: feature
+                                };
+
+                                if (item.label in itemMap) {
+                                    itemMap[item.label].push(obj);
+                                } else {
+                                    itemMap[item.label] = [ obj ];
+                                }
+                            });
+                        });
+                    }
+                });
+
+                var items = Object.keys(itemMap);
+
+                var $search = $('#search');
+
+                $search.typeahead(
+                    {
+                        hint: true,
+                        highlight: true,
+                        minLength: 1
+                    },
+                    {
+                        name: 'states',
+                        displayKey: 'value',
+                        source: substringMatcher(items)
+                    }
+                );
+
+                var availableFrom = document.getElementById("availablefrom");
+
+                $search.keyup(function() {
+                    var val = $search.val();
+
+                    if (val in itemMap) {
+                        var uris = itemMap[val];
+
+                        availableFrom.innerHTML = "";
+
+                        var ul = document.createElement("ul");
+
+                        uris.forEach(function(result) {
+                            var feature = result.feature;
+                            console.log(feature.properties);
+                            var li = document.createElement("li");
+
+                            var a = document.createElement("a");
+                            a.textContent = feature.properties.name; //+ " (" + result.uri + ")";
+                            a.href = "#";
+                            a.onclick = function() {
+                                console.log(feature.properties.uri);
+                                map.show(feature.properties.uri);
+                                return false;
+                            };
+
+                            li.appendChild(a);
+                            ul.appendChild(li);
+                        });
+
+                        availableFrom.appendChild(ul);
+                    }
+                });
             });
-
-            var items = Object.keys(itemMap);
-
-            var $search = $('#search');
-
-            $search.typeahead(
-                {
-                    hint: true,
-                    highlight: true,
-                    minLength: 1
-                },
-                {
-                    name: 'states',
-                    displayKey: 'value',
-                    source: substringMatcher(items)
-                }
-            );
-
-            var availableFrom = document.getElementById("availablefrom");
-
-            $search.keyup(function() {
-                var val = $search.val();
-
-                if (val in itemMap) {
-                    var uris = itemMap[val];
-
-                    availableFrom.innerHTML = "";
-
-                    var ul = document.createElement("ul");
-
-                    uris.forEach(function(result) {
-                        var feature = result.feature;
-                        console.log(feature.properties);
-                        var li = document.createElement("li");
-
-                        var a = document.createElement("a");
-                        a.textContent = feature.properties.name; //+ " (" + result.uri + ")";
-                        a.href = "#";
-                        a.onclick = function() {
-                            console.log(feature.properties.uri);
-                            map.show(feature.properties.uri);
-                            return false;
-                        };
-
-                        li.appendChild(a);
-                        ul.appendChild(li);
-                    });
-
-                    availableFrom.appendChild(ul);
-                }
-            });
-        });
+        })();
     </script>
 </body>
 </html>

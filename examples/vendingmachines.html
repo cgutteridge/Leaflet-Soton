@@ -32,14 +32,16 @@
         LS.imagePath = '../resources/images/';
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map', {
-            indoor: false,
-        });
+        (function() {
+            var map = LS.map('map', {
+                indoor: false,
+            });
 
-        LS.getData(function(data) {
-            var layer = LS.getVendingMachinesLayer();
-            layer.addTo(map);
-        });
+            LS.getData(function(data) {
+                var layer = LS.getVendingMachinesLayer();
+                layer.addTo(map);
+            });
+        })();
     </script>
 </body>
 </html>

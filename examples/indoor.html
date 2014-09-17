@@ -30,9 +30,11 @@
         LS.dataPath = '../data.json';
         LS.imagePath = '../resources/images/';
 
-        var map = LS.map('map', {
-            indoor: true
-        });
+        (function() {
+            var map = LS.map('map', {
+                indoor: true
+            });
+        })();
     </script>
 </body>
 </html>

@@ -119,14 +119,17 @@
                 pointToLayer: vendingPointToLayer,
                 onEachFeature: function(feature, layer) {
                     layer.on('click', function(e) {
-                        var popupOptions = {
-                            offset: icons.vendingHotDrinks.options.popupAnchor
-                        };
 
-                        var content = vendingPopupTemplate(feature.properties);
+                        // If this is a leaflet-soton map
+                        if ("showInfo" in this._map) {
+                          var popupOptions = {
+                              offset: icons.vendingHotDrinks.options.popupAnchor
+                          };
 
-                        // TODO: Unsure if map is accessible?
-                        map.showInfo(content, e.latlng, popupOptions);
+                          var content = vendingPopupTemplate(feature.properties);
+
+                          this._map.showInfo(content, e.latlng, popupOptions);
+                        }
                     });
                 }
             });
