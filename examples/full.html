@@ -36,12 +36,14 @@
         LS.imagePath = '../resources/images/';
         LS.dataPath = '../data.json';
 
-        var map = LS.map('map', {
-            workstations: true,
-            indoor: true
-        });
+        (function() {
+          var map = LS.map('map', {
+              workstations: true,
+              indoor: true
+          });
 
-        L.control.locate().addTo(map);
+          L.control.locate().addTo(map);
+        })();
     </script>
 </body>
 </html>

@@ -952,6 +952,8 @@ SELECT * WHERE {\
 
         },
         showInfo: function(content, latlng, options) {
+            var map = this;
+
             options = options || {};
 
             options.maxWidth = map.getContainer().offsetWidth;
@@ -966,6 +968,8 @@ SELECT * WHERE {\
             popup.openOn(map);
         },
         closeInfo: function() {
+            var map = this;
+
             if (map._popup) {
                 map.closePopup(map._popup);
             }
