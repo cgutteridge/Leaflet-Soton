@@ -1143,6 +1143,8 @@ SELECT * WHERE {\
         if (!("name" in properties)) {
             if (properties["buildingpart:verticalpassage"] === "stairway") {
                 properties.name = "Stairway";
+            } else if (properties["buildingpart:verticalpassage"] === "lift") {
+                properties.name = "Lift";
             } else {
                 properties.name = "Vertical Passage";
             }
