@@ -258,6 +258,14 @@ SELECT * WHERE {\
     var icons = {
         created: false,
         createIcons: function() {
+            this.busStop = L.icon({
+                iconUrl: LS.imagePath + 'busstop.png',
+
+                iconSize:     [32, 37], // size of the icon
+                iconAnchor:   [16, 37], // point of the icon which will correspond to marker's location
+                popupAnchor:  [0, -35]  // point from which the popup should open relative to the iconAnchor
+            });
+
             this.printer = L.icon({
                 iconUrl: LS.imagePath + 'printer.png',
 
@@ -366,10 +374,35 @@ SELECT * WHERE {\
         };
     };
 
+    function featureHasPopup( feature )
+    {
+        if (feature.properties.buildingpart === "corridor") {
+            return; // No popup for corridors yet
+        }
+
+        if( !('features' in feature.properties) ) { feature.properties.features=[]; }
+        if( !('contents' in feature.properties) ) { feature.properties.contents=[]; }
+        if( !('images' in feature.properties) ) { feature.properties.images=[]; }
+
+        if ('buildingpart' in feature.properties) {
+            if( feature.properties.features.length==0 
+             && feature.properties.contents.length==0 
+             && feature.properties.images.length==0 ) {
+                return false;
+            }
+        }
+   
+        return true;
+    }
+
     var emptyFeatureCollection = { type: "FeatureCollection", features: [] };
     var transparaentStyle = function(feature) {return {weight: 0, opacity: 0, fillOpacity: 0};};
 
-    var layerNames = ['sites', 'parking', 'bicycleParking', 'buildings'];
+    var layerNames = [
+        'sites', 
+       // 'parking', 
+        'bicycleParking', 
+        'buildings'];
 
     var busRouteStyle = function(feature) {
         return {weight: 5, opacity: 0.5, color: feature.properties.colour};
@@ -622,7 +655,7 @@ SELECT * WHERE {\
                                     if ("name" in part.properties && "ref" in part.properties) {
                                         content = part.properties.name + " (" + part.properties.ref + ")";
                                     } else if ("ref" in part.properties) {
-                                        content = "Room " + part.properties.ref;
+                                        content = "<span style='font-size:90%'>room</span><br/>" + part.properties.ref;
                                     } else if ("name" in part.properties) {
                                         content = part.properties.name;
                                     } else {
@@ -676,34 +709,10 @@ SELECT * WHERE {\
                                 }
                             },
                             onEachFeature: function(feature, layer) {
-                                if (feature.properties.buildingpart === "corridor") {
-                                    return; // No popup for corridors yet
-                                }
-
+                                if( !featureHasPopup(feature) ) { return; }
                                 layer.on('click', function(e) {
-                                    var content;
-                                    var popupOptions = {};
-
-                                    // When the feature is clicked on
-                                    if ("buildingpart" in feature.properties) {
-                                        if (feature.properties.buildingpart === "room") {
-                                            content = roomPopupTemplate(feature.properties, options);
-                                        } else if (feature.properties.buildingpart === "verticalpassage") {
-                                            content = verticalPassagePopupTemplate(feature.properties);
-                                        }
-                                    } else { // Assume that it is a printer
-                                        // TODO: Use different icons where appropriate
-                                        popupOptions.offset = icons.vendingHotDrinks.options.popupAnchor;
-
-                                        if ('vending' in feature.properties) {
-                                            content = vendingPopupTemplate(feature.properties);
-                                        } else {
-                                            content = printerPopupTemplate(feature.properties);
-                                        }
-                                    }
-
-                                    map.showInfo(content, e.latlng, popupOptions);
-                                });
+                                    map.showFeaturePopup( feature, e.latlng );
+                                } );
                             },
                             pointToLayer: function (feature, latlng) {
                                 if ('vending' in feature.properties) {
@@ -864,7 +873,7 @@ SELECT * WHERE {\
 
                 return;
             } else if (feature.geometry.type === "Point") {
-                this.setView(L.GeoJSON.coordsToLatLng(feature.geometry.coordinates), 22);
+                this.setView(L.GeoJSON.coordsToLatLng(feature.geometry.coordinates), 20);
 
                 if ("level" in feature.properties) {
                     if (L.Util.isArray(feature.properties.level)) {
@@ -889,7 +898,7 @@ SELECT * WHERE {\
                 throw "unable to handle " + feature.geometry.type;
             }
         },
-        panByURI: function(uri) {
+        panByURI: function(uri,zoom,opts) {
             var feature = LS.getFeatureByURI(uri);
 
             if (feature === null) {
@@ -900,18 +909,16 @@ SELECT * WHERE {\
                 throw "no location for " + uri;
             }
 
+            var target_loc;
             if (feature.geometry.type === "Polygon") {
                 console.log(feature);
 
-                var center;
                 if ("center" in feature.properties) {
-                    center = feature.properties.center;
+                    target_loc = feature.properties.center;
                 } else {
-                    center = feature.geometry.coordinates[0][0];
-                    center = [center[1], center[0]];
+                    target_loc = feature.geometry.coordinates[0][0];
+                    target_loc = [center[1], center[0]];
                 }
-
-                this.panTo(center);
 
                 if ("level" in feature.properties) {
                     if (L.Util.isArray(feature.properties.level)) {
@@ -920,12 +927,8 @@ SELECT * WHERE {\
                         this.setLevel(feature.properties.level);
                     }
                 }
-
-                this.closePopup();
-
-                return;
             } else if (feature.geometry.type === "Point") {
-                this.panTo(L.GeoJSON.coordsToLatLng(feature.geometry.coordinates));
+                target_loc = L.GeoJSON.coordsToLatLng(feature.geometry.coordinates);
 
                 if ("level" in feature.properties) {
                     if (L.Util.isArray(feature.properties.level)) {
@@ -943,18 +946,19 @@ SELECT * WHERE {\
                         }
                     }
                 }
-
-                this.closePopup();
-                return;
             } else {
                 throw "unable to handle " + feature.geometry.type;
             }
-
+            this.closePopup();
+            this.setView(target_loc,zoom,opts);
         },
         showInfo: function(content, latlng, options) {
+            var map=this;
             options = options || {};
 
-            options.maxWidth = map.getContainer().offsetWidth;
+            options.maxWidth = map.getContainer().offsetWidth*0.9;
+            options.minWidth = 320;
+            //options.maxHeight = map.getContainer().offsetHeight*0.8;
 
             map.closeInfo();
 
@@ -966,9 +970,35 @@ SELECT * WHERE {\
             popup.openOn(map);
         },
         closeInfo: function() {
+            var map=this;
             if (map._popup) {
                 map.closePopup(map._popup);
             }
+        },
+    	showFeaturePopup: function(feature,latlng )
+        {
+            var map = this;
+            var content;
+            var popupOptions = {};
+    
+            // When the feature is clicked on
+            if ("buildingpart" in feature.properties) {
+                if (feature.properties.buildingpart === "room") {
+                    content = roomPopupTemplate(feature.properties, options,map);
+                } else if (feature.properties.buildingpart === "verticalpassage") {
+                    content = verticalPassagePopupTemplate(feature.properties);
+                }
+            } else { // Assume that it is a printer
+                // TODO: Use different icons where appropriate
+                popupOptions.offset = icons.vendingHotDrinks.options.popupAnchor;
+    
+                if ('vending' in feature.properties) {
+                    content = vendingPopupTemplate(feature.properties);
+                } else {
+                    content = printerPopupTemplate(feature.properties);
+                }
+            }
+            map.showInfo(content, latlng, popupOptions);
         }
     });
 
@@ -995,11 +1025,11 @@ SELECT * WHERE {\
     var popupTemplates = {
         sites: siteTemplate,
         buildings: buildingTemplate,
-        bicycleParking: bicycleParkingTemplate,
-        parking: parkingTemplate,
+        bicycleParking: bicycleParkingTemplate
+        //parking: parkingTemplate
     };
 
-    function roomPopupTemplate(properties, options) {
+    function roomPopupTemplate(properties, options,map) {
         properties = L.extend({}, properties);
 
         if (!("name" in properties)) {
@@ -1011,26 +1041,10 @@ SELECT * WHERE {\
 
         return getTemplateWrapper(properties, function(content) {
 
-            var tabs = [
-                {
-                    id: 'contents',
-                    name: 'Contents',
-                    active: true
-                },
-                {
-                    id: 'features',
-                    name: 'Features',
-                },
-                {
-                    id: 'bookings',
-                    name: 'Bookings',
-                },
-                {
-                    id: 'pictures',
-                    name: 'Pictures',
-                }];
-
-            tabs = createTabs(tabs, content);
+            var image_dom = imageTemplate( properties,options,map,close);
+            if( image_dom ) { content.appendChild( image_dom ); }
+            
+            return;
 
             if ('contents' in properties) {
                 properties.contents.forEach(function(feature) {
@@ -1077,59 +1091,6 @@ SELECT * WHERE {\
                                 tabs.bookings);
             }
 
-            if ('images' in properties) {
-                properties.images.forEach(function(image) {
-
-                    var versions = image.versions;
-                    var url,
-                        imageWidth,
-                        imageHeight;
-
-                    for (var i=0; i<versions.length; i++) {
-                        var version = versions[i];
-                        url = version.url;
-
-                        imageWidth = version.width;
-                        imageHeight = version.height;
-
-                        var widthBound;
-                        var heightBound;
-                        if ("popupWidth" in options && "popupHeight" in options) {
-                            widthBound = options.popupWidth;
-                            heightBound = options.popupHeight;
-                        } else {
-                            var mapContainer = map.getContainer();
-                            widthBound = mapContainer.offsetWidth;
-                            heightBound = mapContainer.offsetHeight;
-
-                            widthBound *= 0.7;
-                            heightBound *= 0.7;
-                        }
-
-                        if (imageWidth < widthBound &&
-                            imageHeight < heightBound) {
-                            break; // Use this image, as it is the first smaller
-                                   // than the screen width
-                        }
-                    }
-
-                    if (url !== null) {
-                        // Link to the biggest image (versions is sorted by size on the server)
-                        var imageLink = createBlankLink(versions[0].url, false, tabs.pictures);
-
-                        var image = document.createElement('img');
-                        image.setAttribute('src', url);
-                        image.setAttribute('width', imageWidth);
-                        image.setAttribute('height', imageHeight);
-
-                        imageLink.appendChild(image);
-
-                        //createBlankLink(properties.images[0].licence, "Licence", tabs.picture);
-                    } else {
-                        tabs.picture.textContent = "No Image Available";
-                    }
-                });
-            }
         });
     }
 
@@ -1191,249 +1152,198 @@ SELECT * WHERE {\
         });
     }
 
+    function imageTemplate(properties, options, map, close )
+    {
+        if (properties.images.length == 0) { return false; }
+
+        var imageWidth;
+        var imageHeight;
+
+        var versions = properties.images[0].versions;
+        var url;
+
+        var widthBound;
+        var heightBound;
+        if ("popupWidth" in options && "popupHeight" in options) {
+            widthBound = options.popupWidth;
+            heightBound = options.popupHeight;
+        } else {
+            var mapContainer = map.getContainer();
+            widthBound = mapContainer.offsetWidth;
+            heightBound = mapContainer.offsetHeight;
+
+            widthBound *= 0.7;
+            heightBound *= 0.7;
+        }
+
+        for (var i=0; i<versions.length; i++) {
+            var version = versions[i];
+            url = version.url;
+
+            imageWidth = version.width;
+            imageHeight = version.height;
+
+            if (imageWidth < widthBound &&
+                imageHeight < heightBound) {
+                break; // Use this image, as it is the first smaller
+                       // than the screen width
+            }
+        }
+
+        if (url == null) { return false; }
+
+        var content = document.createElement( "div" );
+
+        var image = document.createElement('img');
+        image.setAttribute('src', url);
+        image.setAttribute('width', imageWidth);
+        image.setAttribute('height', imageHeight);
+        image.style.margin = 'auto';
+        image.style.display = 'block';
+        content.appendChild(image);
+
+        // Link to the biggest image (versions is sorted by size on the server)
+        var imageLink = createBlankLink(versions[0].url, false, content);
+        imageLink.style.textAlign = 'right';
+        imageLink.style.display = 'block';
+        imageLink.style.width = imageWidth+"px";
+        imageLink.style.margin = 'auto';
+        imageLink.textContent="View fullsize photo";
+
+        //createBlankLink(properties.images[0].licence, "Licence", content);
+        return content;
+    }
+
+    function addRoomsToFloors( floors, properties,options,map,close )
+    {
+        for (var level in properties.rooms) {
+            var rooms = properties.rooms[level];
+
+            rooms.forEach(function(uri) {
+                var room = LS.getFeatureByURI(uri);
+
+                var info = { "label":"???", "uri":uri, "geo":false };
+
+                if (room === null) {
+                    console.err("Unable to find room " + uri);
+                    return;
+                }
+
+                info.label = room.properties.ref;
+                if ("name" in room.properties) {
+                    info.label += ":  " + room.properties.name;
+                }
+
+                if ("center" in room.properties) {
+                    info.geo = true;
+                } 
+
+                if( !( level in floors ) ) { floors[level] = {}; }
+                floors[level][uri] = info;
+            });
+        }
+    }
+
+    function addVendingMachinesToFloors( floors, properties,options,map,close )
+    {
+        if (!("services" in properties)) { return; }
+        if (!("vendingMachines" in properties.services)) { return; }
+        var level = "Unknown";
+
+        properties.services.vendingMachines.forEach(function(machine) {
+            var feature = LS.getFeatureByURI(machine);
+
+            if (feature === null) {
+                console.error("no feature for " + machine);
+                return;
+            }            
+
+            var info = { "label":feature.properties.label, "uri":feature.properties.uri, "geo":false };
+            if ("geometry" in feature) { info.geo = true; }
+
+            if( !( level in floors ) ) { floors[level] = {}; }
+            floors[level][feature.properties.uri] = info;
+        });
+    }
+
+    function addMFDsToFloors( floors, properties,options,map,close )
+    {
+        if (!("services" in properties)) { return; }
+        if (!("mfds" in properties.services)) { return; }
+        var level = "Unknown";
+
+        properties.services.mfds.forEach(function(machine) {
+            var feature = LS.getFeatureByURI(machine);
+
+            if (feature === null) {
+                console.error("no feature for " + machine);
+                return;
+            }            
+
+            var info = { "label":feature.properties.label, "uri":feature.properties.uri, "geo":false };
+            if ("geometry" in feature) { info.geo = true; }
+
+            if( !( level in floors ) ) { floors[level] = {}; }
+            floors[level][feature.properties.uri] = info;
+        });
+    }
+
+    function renderThingSet( set, map, close )
+    {
+        var content_ids = Object.keys( set );
+        var content = document.createElement( 'div' );
+        content_ids.forEach(function(thing_id) {
+            var info = set[thing_id];
+            var div = document.createElement( 'div' );
+            var html = "<a title='click for more information' href='"+info.uri+"'>"+info.label+"</a>";
+            div.innerHTML = html;
+            if( info.geo ) {
+                div.appendChild( document.createTextNode( ' ' ) );
+                var locate_link = createLink('#', false, div);
+
+                locate_link.onclick = function() {
+                    var feature = LS.getFeatureByURI(info.uri);
+                    close();
+                    map.panByURI(info.uri,20,{ 'animate':true });
+                    if( featureHasPopup(feature) ) { 
+                        map.showFeaturePopup( feature, feature.properties.center );
+                    }
+                };
+
+                locate_link.innerHTML = ' <span title="Show this on map" class="glyphicon glyphicon-screenshot"></span>';
+            }
+
+            content.appendChild( div );
+        });
+        return content;
+    }
+
     function buildingTemplate(properties, options, map, close) {
         var indoor = options.indoor;
 
         return getTemplateWrapper(properties, function(content) {
 
-            var buildingTabs = [
-                {
-                    id: 'picture',
-                    name: 'Pictures',
-                    active: true
-                },
-                {
-                    id: 'energyUsage',
-                    name: 'Energy Usage',
-                }];
+            var image_dom = imageTemplate( properties,options,map,close);
+            if( image_dom ) { content.appendChild( image_dom ); }
 
-            if (indoor) {
-                buildingTabs.push({
-                    id: 'rooms',
-                    name: 'Facilities',
-                });
-
-                buildingTabs.push({
-                    id: 'services',
-                    name: 'Services',
-                });
-            }
-
-            var tabs = createTabs(buildingTabs, content);
-
-            var imageWidth;
-            var imageHeight;
-
-            if (properties.images.length !== 0) {
-
-                var versions = properties.images[0].versions;
-                var url;
-
-                var widthBound;
-                var heightBound;
-                if ("popupWidth" in options && "popupHeight" in options) {
-                    widthBound = options.popupWidth;
-                    heightBound = options.popupHeight;
-                } else {
-                    var mapContainer = map.getContainer();
-                    widthBound = mapContainer.offsetWidth;
-                    heightBound = mapContainer.offsetHeight;
-
-                    widthBound *= 0.7;
-                    heightBound *= 0.7;
-                }
-
-                for (var i=0; i<versions.length; i++) {
-                    var version = versions[i];
-                    url = version.url;
-
-                    imageWidth = version.width;
-                    imageHeight = version.height;
-
-                    if (imageWidth < widthBound &&
-                        imageHeight < heightBound) {
-                        break; // Use this image, as it is the first smaller
-                               // than the screen width
-                    }
-                }
-
-                if (url !== null) {
-                    // Link to the biggest image (versions is sorted by size on the server)
-                    var imageLink = createBlankLink(versions[0].url, false, tabs.picture);
-
-                    tabs.picture.style.minWidth = imageWidth + "px";
-                    tabs.picture.style.minHeight = imageHeight + "px";
-
-                    var image = document.createElement('img');
-                    image.setAttribute('src', url);
-                    image.setAttribute('width', imageWidth);
-                    image.setAttribute('height', imageHeight);
-
-                    imageLink.appendChild(image);
-
-                    //createBlankLink(properties.images[0].licence, "Licence", tabs.picture);
-                } else {
-                    tabs.picture.textContent = "No Image Available";
-                }
-            } else {
-
-            }
-
-            var energyIFrame = document.createElement('iframe');
-            energyIFrame.setAttribute('src', 'http://data.southampton.ac.uk/time-series?action=fetch&series=elec/b' + properties.loc_ref + '/ekw&type=average&format=graph&resolution=3600&startTime=1375009698000.0');
-            energyIFrame.setAttribute('frameBorder', '0');
-            energyIFrame.setAttribute('style', 'width: 100%; height 100%;');
-
-            tabs.energyUsage.style.minWidth = imageWidth + "px";
-            tabs.energyUsage.style.minHeight = imageHeight + "px";
-            tabs.energyUsage.appendChild(energyIFrame);
-
-            createBlankLink('http://data.southampton.ac.uk/time-series?action=fetch&series=elec/b' + properties.loc_ref + '/ekw&type=average&format=graph&resolution=3600&startTime=0', 'Graph for all time', tabs.energyUsage);
-
+            var floors = {};
             // Rooms
             if (indoor) {
-
-                tabs.rooms.style.minHeight = imageHeight + "px";
-                tabs.rooms.style.maxHeight = imageHeight + "px";
-
-                tabs.rooms.style.overflow = 'auto';
-
-                for (var level in properties.rooms) {
-                    var rooms = properties.rooms[level];
-
-                    // Heading
-
-                    var panelTitle = L.DomUtil.create('h4', '', tabs.rooms);
-                    panelTitle.textContent = "Level " + level;
-
-                    // Content
-
-                    var contentPanel = L.DomUtil.create('div', '', tabs.rooms);
-
-                    rooms.forEach(function(uri) {
-                        var room = LS.getFeatureByURI(uri);
-
-                        if (room === null) {
-                            console.err("Unable to find room " + uri);
-                            return;
-                        }
-
-                        var teachingAndBookable = "";
-
-                        if (room.properties.teaching) {
-                            teachingAndBookable += " (T) ";
-                        }
-
-                        if (room.properties.teaching) {
-                            teachingAndBookable += " (B)";
-                        }
-
-                        var roomProps = document.createTextNode(teachingAndBookable);
-
-                        var description = room.properties.ref;
-                        if ("name" in room.properties) {
-                            description += ":  " + room.properties.name;
-                        }
-
-                        if ("center" in room.properties) {
-                            var roomLink = createLink('#', false, tabs.rooms);
-
-                            roomLink.onclick = function() {
-                                close();
-                                map.showByURI(uri);
-                            };
-
-                            roomLink.textContent = description;
-                        } else {
-                            var roomText = document.createTextNode(description);
-
-                            tabs.rooms.appendChild(roomText);
-                        }
-
-                        tabs.rooms.appendChild(roomProps);
-
-                        var moreInfo = createBlankLink(uri, "(More Information)", tabs.rooms);
-                        moreInfo.style.cssFloat = moreInfo.style.styleFloat = "right";
-
-                        tabs.rooms.appendChild(document.createElement('br'));
-                    });
-                }
-
-                tabs.services.style.minHeight = imageHeight + "px";
-                tabs.services.style.maxHeight = imageHeight + "px";
-
-                tabs.services.style.overflow = 'auto';
-
-                if ("services" in properties) {
-                    if ("vendingMachines" in properties.services) {
-                        title = L.DomUtil.create('h4', '', tabs.services);
-                        title.textContent = "Vending Machines";
-
-                        properties.services.vendingMachines.forEach(function(machine) {
-                            var feature = LS.getFeatureByURI(machine);
-
-                            if (feature === null) {
-                                console.error("no feature for " + machine);
-                                return;
-                            }
-
-                            if ("geometry" in feature) {
-                                var machineLink = createLink('#', false, tabs.services);
-
-                                machineLink.onclick = function() {
-                                    close();
-                                    map.showByURI(machine);
-                                };
-
-                                machineLink.textContent = feature.properties.label;
-                            } else {
-                                var note = document.createTextNode(feature.properties.label);
-
-                                tabs.services.appendChild(note);
-                            }
-
-                            var moreInfo = createBlankLink(machine, "(More Information)", tabs.services);
-                            moreInfo.style.cssFloat = moreInfo.style.styleFloat = "right";
-
-                            tabs.services.appendChild(document.createElement('br'));
-                        });
-                    }
-
-                    if ("mfds" in properties.services) {
-                        var title = L.DomUtil.create('h4', '', tabs.services);
-                        title.textContent = "Multi-Function Devices";
-
-                        properties.services.mfds.forEach(function(mfd) {
-                            var feature = LS.getFeatureByURI(mfd);
-
-                            if (feature === null) {
-                                console.error("no feature for " + mfd);
-                                return;
-                            }
-
-                            if ("geometry" in feature) {
-                                var mfdLink = createLink('#', false, tabs.services);
-
-                                mfdLink.onclick = function() {
-                                    close();
-                                    map.showByURI(mfd);
-                                };
-
-                                mfdLink.textContent = feature.properties.label;
-                            } else {
-                                var note = document.createTextNode(feature.properties.label);
-
-                                tabs.services.appendChild(note);
-                            }
-
-                            var moreInfo = createBlankLink(mfd, "(More Information)", tabs.services);
-                            moreInfo.style.cssFloat = moreInfo.style.styleFloat = "right";
-
-                            tabs.services.appendChild(document.createElement('br'));
-                        });
-                    }
-                }
+                addRoomsToFloors( floors,properties,options,map,close );
+                addVendingMachinesToFloors( floors,properties,options,map,close );
+                addMFDsToFloors( floors,properties,options,map,close );
             }
+            //content.appendChild( document.createTextNode( JSON.stringify(floors)));
+
+            var floor_ids = Object.keys( floors );
+            floor_ids.sort();
+            
+            floor_ids.forEach(function(floor_id) {
+                var h4 = document.createElement( "h4" );
+                content.appendChild( h4 );
+                h4.textContent = "Floor "+floor_id;
+                content.appendChild( renderThingSet(floors[floor_id],map,close) );
+            });
         });
     }
 
@@ -1569,7 +1479,7 @@ SELECT * WHERE {\
             link.setAttribute('href', properties.uri);
             link.setAttribute('target', '_blank');
             link.className = 'ls-popup-uri';
-            link.textContent = "(More Information)";
+            link.textContent = "(Full Information)";
 
             div.appendChild(link);
         }
@@ -1581,16 +1491,24 @@ SELECT * WHERE {\
         var titleText = "";
 
         if ('loc_ref' in properties) {
-            titleText += properties.loc_ref + ' ';
+            var span = document.createElement( "span" );
+            span.classList.add("ls-popup-title-ref");
+            title.appendChild( span );
+            span.textContent = properties.loc_ref;
+            title.appendChild( document.createTextNode( " " ) );
         }
 
         if ('name' in properties) {
-            titleText += properties.name;
+            var span = document.createElement( "span" );
+            span.classList.add("ls-popup-title-name");
+            span.textContent = properties.name;
+            title.appendChild( span );
         }
 
-        title.textContent = titleText;
-
-        contentFunction(div);
+        var div_inner = document.createElement("div");
+        div_inner.classList.add("ls-popup-content");
+        contentFunction(div_inner);
+        div.appendChild( div_inner );
 
         return div;
     }
