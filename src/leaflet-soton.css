@@ -5,6 +5,12 @@
 .ls-popup-title {
     font: 25px/16px Arial, Helvetica, sans-serif;
 }
+.ls-popup-title-ref {
+    background-color: black;
+    color: white;
+    padding: 2px 5px 2px 5px;
+    border-radius: 3px;
+}
 
 .ls-popup-uri {
     float: right;
@@ -224,4 +230,13 @@
 
 .ls-stop-list {
     padding-left: 25px;
+}
+
+.ls-popup-content {
+    max-height: 400px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+.leaflet-popup-content {
+    margin: 6px 9px;
 }
