@@ -166,13 +166,17 @@
                 },
                 onEachFeature: function(feature, layer) {
                     layer.on('click', function(e) {
-                        var popupOptions = {
-                            offset: icons.vendingHotDrinks.options.popupAnchor
-                        };
 
-                        var content = pointOfServiceTemplate(feature.properties);
+                        // If this is a leaflet-soton map
+                        if ("showInfo" in this._map) {
+                            var popupOptions = {
+                                offset: icons.vendingHotDrinks.options.popupAnchor
+                            };
 
-                        map.showInfo(content, e.latlng, popupOptions);
+                            var content = pointOfServiceTemplate(feature.properties);
+
+                            this._map.showInfo(content, e.latlng, popupOptions);
+                        }
                     });
                 }
             });
