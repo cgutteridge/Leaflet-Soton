@@ -687,7 +687,7 @@ SELECT * WHERE {\
                                     // When the feature is clicked on
                                     if ("buildingpart" in feature.properties) {
                                         if (feature.properties.buildingpart === "room") {
-                                            content = roomPopupTemplate(feature.properties, options);
+                                            content = roomPopupTemplate(feature.properties, options, map);
                                         } else if (feature.properties.buildingpart === "verticalpassage") {
                                             content = verticalPassagePopupTemplate(feature.properties);
                                         }
@@ -1003,7 +1003,7 @@ SELECT * WHERE {\
         parking: parkingTemplate,
     };
 
-    function roomPopupTemplate(properties, options) {
+    function roomPopupTemplate(properties, options, map) {
         properties = L.extend({}, properties);
 
         if (!("name" in properties)) {
