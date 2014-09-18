@@ -1482,7 +1482,7 @@ SELECT * WHERE {\
     }
 
     function getTemplateWrapper(properties, contentFunction) {
-        var div = document.createElement("div");
+        var documentFragment = new DocumentFragment();
 
         if ('uri' in properties) {
             var link = document.createElement('a');
@@ -1491,12 +1491,12 @@ SELECT * WHERE {\
             link.className = 'ls-popup-uri';
             link.textContent = "(Full Information)";
 
-            div.appendChild(link);
+            documentFragment.appendChild(link);
         }
 
         var title = document.createElement('h2');
         title.classList.add("ls-popup-title");
-        div.appendChild(title);
+        documentFragment.appendChild(title);
 
         var titleText = "";
 
@@ -1518,9 +1518,9 @@ SELECT * WHERE {\
         var div_inner = document.createElement("div");
         div_inner.classList.add("ls-popup-content");
         contentFunction(div_inner);
-        div.appendChild( div_inner );
+        documentFragment.appendChild( div_inner );
 
-        return div;
+        return documentFragment;
     }
 
     var createTabs = function(tabs, container) {
