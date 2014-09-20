@@ -994,7 +994,12 @@ SELECT * WHERE {\
 
             options.maxWidth = map.getContainer().offsetWidth*0.9;
             options.minWidth = 320;
-            //options.maxHeight = map.getContainer().offsetHeight*0.8;
+
+            if (options.minWidth > options.maxWidth) {
+                options.minWidth = options.maxWidth;
+            }
+
+            options.maxHeight = map.getContainer().offsetHeight*0.8;
 
             map.closeInfo();
 
