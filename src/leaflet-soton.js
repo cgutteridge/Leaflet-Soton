@@ -29,7 +29,7 @@
                         if (data === null) {
                             setTimeout(function() {
                                 LS.getData(callback);
-                            }, 1000);
+                            }, 5000);
                             return;
                         }
 
@@ -1632,7 +1632,7 @@ SELECT * WHERE {\
         xhttp.ontimeout = function () {
             callback(null);
         };
-        xhttp.timeout = 3000;
+        xhttp.timeout = 4000;
 
         options.data = options.data || null;
 
