@@ -12,6 +12,8 @@
         workstationData: null,
         updateWorkstationData: true, // regularly poll for workstation data
         workstationDataUpdateTime: 30000, // time to wait between requests
+        useLocalStorage: true,
+        localStorageTimeout: 604800000, // one day in milliseconds
         _workstationDataFetchInProgress: false,
         _workstationDataFetchTimeout: null,
 
@@ -21,9 +23,30 @@
             } else {
                 this.on("dataload", callback);
 
+                if (LS.useLocalStorage &&
+                    'localStorage' in window && window['localStorage'] !== null) {
+
+                    if ("data" in localStorage) {
+                        var refetchTime = localStorage.dataTimestamp + LS.localStorageTimeout;
+
+                        if (refetchTime > new Date().getTime()) {
+                            LS.data = JSON.parse(localStorage.data);
+
+                            LS.fire("dataload", LS.data);
+
+                            return;
+
+                        }
+
+                        // refresh the data, as its too old
+                    }
+
+                    // data not in local storage, so fetch it
+                }
+
                 if (!this._dataFetchInProgress) {
                     this._dataFetchInProgress = true;
-                    getJSON({url: LS.dataPath, cache: false} , function(data) {
+                    getJSON({url: LS.dataPath, cache: false} , function(data, stringData) {
                         LS._dataFetchInProgress = false;
 
                         if (data === null) {
@@ -34,6 +57,12 @@
                         }
 
                         LS.data = data;
+
+                        if (LS.useLocalStorage &&
+                            'localStorage' in window && window['localStorage'] !== null) {
+                            localStorage.data = stringData;
+                            localStorage.dataTimestamp = new Date().getTime();
+                        }
 
                         LS.fire("dataload", data);
                     });
@@ -1648,7 +1677,7 @@ SELECT * WHERE {\
         xhttp.send(options.data);
         xhttp.onreadystatechange = function() {
             if (xhttp.status == 200 && xhttp.readyState == 4) {
-                callback(JSON.parse(xhttp.responseText));
+                callback(JSON.parse(xhttp.responseText), xhttp.responseText);
             }
         };
     }
