@@ -544,7 +544,7 @@ SELECT * WHERE {\
                 }
 
                 if ("Route" in L) {
-                    var routeLayer = new L.Route(options.busRoutes ? data.busRoutes : emptyFeatureCollection, data.busStops, {
+                    var routeLayer = map.routeLayer = new L.Route(options.busRoutes ? data.busRoutes : emptyFeatureCollection, data.busStops, {
                         routeOptions: {
                             onEachFeature: function(feature, layer) {
                                 layer.on('click', function(e) {
