@@ -421,13 +421,15 @@ SELECT * WHERE {\
         if( !('images' in feature.properties) ) { feature.properties.images=[]; }
 
         if ('buildingpart' in feature.properties) {
-            if( feature.properties.features.length==0 
-             && feature.properties.contents.length==0 
-             && feature.properties.images.length==0 ) {
+            if (feature.properties.buildingpart === "room" &&
+                feature.properties.features.length == 0 &&
+                feature.properties.contents.length == 0  &&
+                feature.properties.images.length == 0) {
+
                 return false;
             }
         }
-   
+
         return true;
     }
 
