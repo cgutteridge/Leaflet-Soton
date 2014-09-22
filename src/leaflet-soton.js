@@ -994,14 +994,14 @@ SELECT * WHERE {\
             var map = this;
             options = options || {};
 
-            options.maxWidth = map.getContainer().offsetWidth*0.9;
+            options.maxWidth = map.getContainer().offsetWidth*0.7;
             options.minWidth = 320;
 
             if (options.minWidth > options.maxWidth) {
                 options.minWidth = options.maxWidth;
             }
 
-            options.maxHeight = map.getContainer().offsetHeight*0.8;
+            options.maxHeight = map.getContainer().offsetHeight*0.6;
 
             map.closeInfo();
 
@@ -1518,17 +1518,7 @@ SELECT * WHERE {\
     }
 
     function getTemplateWrapper(properties, contentFunction) {
-        var documentFragment = new DocumentFragment();
-
-        if ('uri' in properties) {
-            var link = document.createElement('a');
-            link.setAttribute('href', properties.uri);
-            link.setAttribute('target', '_blank');
-            link.className = 'ls-popup-uri';
-            link.textContent = "(Full Information)";
-
-            documentFragment.appendChild(link);
-        }
+        var documentFragment = document.createDocumentFragment();
 
         var title = document.createElement('h2');
         title.classList.add("ls-popup-title");
@@ -1550,6 +1540,17 @@ SELECT * WHERE {\
             span.textContent = properties.name;
             title.appendChild( span );
         }
+
+        if ('uri' in properties) {
+            var link = document.createElement('a');
+            link.setAttribute('href', properties.uri);
+            link.setAttribute('target', '_blank');
+            link.className = 'ls-popup-uri';
+            link.textContent = "(Full Information)";
+
+            documentFragment.appendChild(link);
+        }
+
 
         var div_inner = document.createElement("div");
         div_inner.classList.add("ls-popup-content");
