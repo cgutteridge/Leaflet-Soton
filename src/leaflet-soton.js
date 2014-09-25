@@ -639,7 +639,7 @@ SELECT * WHERE {\
                                     };
                                 }
 
-                                var fill = 'white';
+                                var fill = '#def5fc';
                                 if (feature.properties.buildingpart === 'corridor') {
                                     fill = '#169EC6';
                                 } else if (feature.properties.buildingpart === 'verticalpassage') {
