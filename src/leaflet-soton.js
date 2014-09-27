@@ -416,18 +416,10 @@ SELECT * WHERE {\
             return; // No popup for corridors yet
         }
 
-        if( !('features' in feature.properties) ) { feature.properties.features=[]; }
-        if( !('contents' in feature.properties) ) { feature.properties.contents=[]; }
-        if( !('images' in feature.properties) ) { feature.properties.images=[]; }
+        if (feature.properties.buildingspart === "room" &&
+            !("uri" in feature.properties)) {
 
-        if ('buildingpart' in feature.properties) {
-            if (feature.properties.buildingpart === "room" &&
-                feature.properties.features.length == 0 &&
-                feature.properties.contents.length == 0  &&
-                feature.properties.images.length == 0) {
-
-                return false;
-            }
+            return false;
         }
 
         return true;
@@ -1201,9 +1193,11 @@ SELECT * WHERE {\
 
     function imageTemplate(properties, options, map, close) {
 
-        if (properties.images.length == 0) {
+        if (!("images" in properties))
             return false;
-        }
+
+        if (properties.images.length === 0)
+            return false;
 
         var imageWidth;
         var imageHeight;
@@ -1276,7 +1270,7 @@ SELECT * WHERE {\
                 var room = LS.getFeatureByURI(uri);
 
                 if (room === null) {
-                    console.err("Unable to find room " + uri);
+                    console.error("Unable to find room " + uri);
                     return;
                 }
 

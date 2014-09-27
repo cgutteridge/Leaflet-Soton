@@ -452,6 +452,54 @@ SELECT DISTINCT * WHERE {\
             }
         });
 
+        buildingParts.forEach(function(room) {
+            if (room.properties.buildingpart !== "room")
+                return;
+
+            if (room.properties.building in buildings) {
+                var buildingProperties = buildings[room.properties.building].properties;
+
+                var uri;
+
+                if ("uri" in room.properties) {
+                    uri = room.properties.uri;
+                } else {
+                    if (!("ref" in room.properties))
+                        return;
+
+                    uri = "http://id.southampton.ac.uk/room/" + buildingProperties.loc_ref + "-" + room.properties.ref;
+
+                    room.properties.uri = uri;
+                }
+
+                if (!('rooms' in buildingProperties)) {
+                    buildingProperties.rooms = {};
+                }
+
+                if ("level" in room.properties) {
+                    var level = room.properties.level;
+
+                    if (!(level instanceof Array)) {
+                        level = [ level ];
+                    }
+
+                    level.forEach(function(l) {
+                        if (!(l in buildingProperties.rooms)) {
+                            buildingProperties.rooms[l] = [];
+                        }
+
+
+
+                        buildingProperties.rooms[l].push(uri);
+                    });
+                } else {
+                    console.warn("no level for " + JSON.stringify(room, null, 4));
+                }
+            } else {
+                addBuildingMessage(room.building, "errors", "location", "unknown (createBuildingParts)");
+            }
+        });
+
         Object.keys(rooms).forEach(function(uri) {
             var room = rooms[uri];
 
