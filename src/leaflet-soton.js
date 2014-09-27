@@ -729,11 +729,13 @@ SELECT * WHERE {\
                                     var myIcon = L.divIcon({
                                         className: 'ls-room-marker',
                                         html: content,
-                                        iconSize: new L.Point(100, 30),
-                                        iconAnchor: new L.Point(50, 15)
+                                        iconSize: new L.Point(100, 14),
+                                        iconAnchor: new L.Point(50, 7)
                                     });
 
-                                    var marker = L.marker(iconCoords, {icon: myIcon});
+                                    var marker = L.marker(iconCoords, {
+                                        icon: myIcon
+                                    });
 
                                     return marker;
                                 }
