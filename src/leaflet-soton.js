@@ -27,7 +27,7 @@
                     'localStorage' in window && window['localStorage'] !== null) {
 
                     if ("data" in localStorage) {
-                        var refetchTime = localStorage.dataTimestamp + LS.localStorageTimeout;
+                        var refetchTime = parseInt(localStorage.dataTimestamp, 10) + LS.localStorageTimeout;
 
                         if (refetchTime > new Date().getTime()) {
                             LS.data = JSON.parse(localStorage.data);
