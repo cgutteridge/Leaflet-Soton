@@ -13,7 +13,7 @@
         updateWorkstationData: true, // regularly poll for workstation data
         workstationDataUpdateTime: 30000, // time to wait between requests
         useLocalStorage: true,
-        localStorageTimeout: 604800000, // one day in milliseconds
+        localStorageTimeout: 172800, // two days in milliseconds
         _workstationDataFetchInProgress: false,
         _workstationDataFetchTimeout: null,
 
