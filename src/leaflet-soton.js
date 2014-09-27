@@ -747,10 +747,13 @@ SELECT * WHERE {\
                                 }
                             },
                             onEachFeature: function(feature, layer) {
-                                if( !featureHasPopup(feature) ) { return; }
+                                if (!featureHasPopup(feature)) {
+                                    return;
+                                }
+
                                 layer.on('click', function(e) {
-                                    map.showFeaturePopup( feature, e.latlng );
-                                } );
+                                    map.showFeaturePopup(feature, e.latlng, options);
+                                });
                             },
                             pointToLayer: function (feature, latlng) {
                                 if ('vending' in feature.properties) {
@@ -936,7 +939,7 @@ SELECT * WHERE {\
                 throw "unable to handle " + feature.geometry.type;
             }
         },
-        panByURI: function(uri,zoom,opts) {
+        panByURI: function(uri, zoom, opts) {
             var feature = LS.getFeatureByURI(uri);
 
             if (feature === null) {
@@ -949,8 +952,6 @@ SELECT * WHERE {\
 
             var target_loc;
             if (feature.geometry.type === "Polygon") {
-                console.log(feature);
-
                 if ("center" in feature.properties) {
                     target_loc = feature.properties.center;
                 } else {
@@ -987,8 +988,9 @@ SELECT * WHERE {\
             } else {
                 throw "unable to handle " + feature.geometry.type;
             }
+
             this.closePopup();
-            this.setView(target_loc,zoom,opts);
+            this.setView(target_loc, zoom, opts);
         },
         showInfo: function(content, latlng, options) {
             var map = this;
@@ -1019,8 +1021,7 @@ SELECT * WHERE {\
                 map.closePopup(map._popup);
             }
         },
-        showFeaturePopup: function(feature,latlng )
-        {
+        showFeaturePopup: function(feature, latlng, options) {
             var map = this;
             var content;
             var popupOptions = {};
@@ -1028,7 +1029,7 @@ SELECT * WHERE {\
             // When the feature is clicked on
             if ("buildingpart" in feature.properties) {
                 if (feature.properties.buildingpart === "room") {
-                    content = roomPopupTemplate(feature.properties, options,map);
+                    content = roomPopupTemplate(feature.properties, options, map);
                 } else if (feature.properties.buildingpart === "verticalpassage") {
                     content = verticalPassagePopupTemplate(feature.properties);
                 }
@@ -1085,7 +1086,7 @@ SELECT * WHERE {\
 
         return getTemplateWrapper(properties, function(content) {
 
-            var image_dom = imageTemplate( properties,options,map,close);
+            var image_dom = imageTemplate(properties, options, map, close);
             if( image_dom ) { content.appendChild( image_dom ); }
 
             return;
@@ -1198,9 +1199,11 @@ SELECT * WHERE {\
         });
     }
 
-    function imageTemplate(properties, options, map, close )
-    {
-        if (properties.images.length == 0) { return false; }
+    function imageTemplate(properties, options, map, close) {
+
+        if (properties.images.length == 0) {
+            return false;
+        }
 
         var imageWidth;
         var imageHeight;
@@ -1236,8 +1239,6 @@ SELECT * WHERE {\
             }
         }
 
-        if (url == null) { return false; }
-
         var content = document.createElement( "div" );
 
         var image = document.createElement('img');
@@ -1260,43 +1261,39 @@ SELECT * WHERE {\
         return content;
     }
 
-    function addRoomsToFloors( floors, properties,options,map,close )
-    {
-        for (var level in properties.rooms) {
-            var rooms = properties.rooms[level];
+    function addRoomsToFloors(rooms, floors) {
+        for (var level in rooms) {
+            var levelRooms = rooms[level];
 
-            rooms.forEach(function(uri) {
+            levelRooms.forEach(function(uri) {
                 var room = LS.getFeatureByURI(uri);
-
-                var info = { "label":"???", "uri":uri, "geo":false };
 
                 if (room === null) {
                     console.err("Unable to find room " + uri);
                     return;
                 }
 
-                info.label = room.properties.ref;
+                var info = {
+                    label: room.properties.ref,
+                    uri: uri,
+                    geo: ("center" in room.properties)
+                };
+
                 if ("name" in room.properties) {
                     info.label += ":  " + room.properties.name;
                 }
 
-                if ("center" in room.properties) {
-                    info.geo = true;
+                if(!(level in floors)) {
+                    floors[level] = {};
                 }
 
-                if( !( level in floors ) ) { floors[level] = {}; }
                 floors[level][uri] = info;
             });
         }
     }
 
-    function addVendingMachinesToFloors( floors, properties,options,map,close )
-    {
-        if (!("services" in properties)) { return; }
-        if (!("vendingMachines" in properties.services)) { return; }
-        var level = "Unknown";
-
-        properties.services.vendingMachines.forEach(function(machine) {
+    function addVendingMachinesToFloors(vendingMachines, floors) {
+        vendingMachines.forEach(function(machine) {
             var feature = LS.getFeatureByURI(machine);
 
             if (feature === null) {
@@ -1304,21 +1301,28 @@ SELECT * WHERE {\
                 return;
             }
 
-            var info = { "label":feature.properties.label, "uri":feature.properties.uri, "geo":false };
-            if ("geometry" in feature) { info.geo = true; }
+            var info = {
+                label: feature.properties.label,
+                uri: feature.properties.uri,
+                geo: ("geometry" in feature)
+            };
 
-            if( !( level in floors ) ) { floors[level] = {}; }
+            var level = "Unknown";
+
+            if ("level" in feature.properties) {
+                level = feature.properties.level;
+            }
+
+            if (!(level in floors)) {
+                floors[level] = {};
+            }
+
             floors[level][feature.properties.uri] = info;
         });
     }
 
-    function addMFDsToFloors( floors, properties,options,map,close )
-    {
-        if (!("services" in properties)) { return; }
-        if (!("mfds" in properties.services)) { return; }
-        var level = "Unknown";
-
-        properties.services.mfds.forEach(function(machine) {
+    function addMFDsToFloors(mfds, floors) {
+        mfds.forEach(function(machine) {
             var feature = LS.getFeatureByURI(machine);
 
             if (feature === null) {
@@ -1326,16 +1330,27 @@ SELECT * WHERE {\
                 return;
             }
 
-            var info = { "label":feature.properties.label, "uri":feature.properties.uri, "geo":false };
-            if ("geometry" in feature) { info.geo = true; }
+            var info = {
+                label: feature.properties.label,
+                uri: feature.properties.uri,
+                geo: ("geometry" in feature)
+            };
 
-            if( !( level in floors ) ) { floors[level] = {}; }
+            var level = "Unknown";
+
+            if ("level" in feature.properties) {
+                level = feature.properties.level;
+            }
+
+            if(!(level in floors)) {
+                floors[level] = {};
+            }
+
             floors[level][feature.properties.uri] = info;
         });
     }
 
-    function renderThingSet( set, map, close )
-    {
+    function renderThingSet(set, map, options, close) {
         var content_ids = Object.keys( set );
         var content = document.createElement( 'div' );
         content_ids.forEach(function(thing_id) {
@@ -1349,14 +1364,27 @@ SELECT * WHERE {\
 
                 locate_link.onclick = function() {
                     var feature = LS.getFeatureByURI(info.uri);
+
                     close();
-                    map.panByURI(info.uri,20,{ 'animate':true });
-                    if( featureHasPopup(feature) ) {
-                        map.showFeaturePopup( feature, feature.properties.center );
+
+                    map.panByURI(info.uri, 20, {
+                        animate: true
+                    });
+
+                    if (featureHasPopup(feature)) {
+                        var latlng;
+
+                        if (feature.geometry.type === "Polygon") {
+                            latlng = feature.properties.center;
+                        } else if (feature.geometry.type === "Point") {
+                            latlng = L.GeoJSON.coordsToLatLng(feature.geometry.coordinates);
+                        }
+
+                        map.showFeaturePopup(feature, latlng, options);
                     }
                 };
 
-                locate_link.innerHTML = ' <span title="Show this on map" class="glyphicon glyphicon-screenshot"></span>';
+                locate_link.innerHTML = ' <span title="Show this on map" class="glyphicon glyphicon-screenshot">\u2316</span>';
             }
 
             content.appendChild( div );
@@ -1369,17 +1397,30 @@ SELECT * WHERE {\
 
         return getTemplateWrapper(properties, function(content) {
 
-            var image_dom = imageTemplate( properties,options,map,close);
-            if( image_dom ) { content.appendChild( image_dom ); }
+            var image_dom = imageTemplate(properties, options, map, close);
+
+            if (image_dom) {
+                content.appendChild(image_dom);
+            }
 
             var floors = {};
+
             // Rooms
             if (indoor) {
-                addRoomsToFloors( floors,properties,options,map,close );
-                addVendingMachinesToFloors( floors,properties,options,map,close );
-                addMFDsToFloors( floors,properties,options,map,close );
+                addRoomsToFloors(properties.rooms, floors);
+
+                if ("services" in properties) {
+                    var services = properties.services;
+
+                    if ("vendingMachines" in services) {
+                        addVendingMachinesToFloors(services.vendingMachines, floors);
+                    }
+
+                    if ("mfds" in services) {
+                        addMFDsToFloors(services.mfds, floors);
+                    }
+                }
             }
-            //content.appendChild( document.createTextNode( JSON.stringify(floors)));
 
             var floor_ids = Object.keys( floors );
             floor_ids.sort();
@@ -1388,7 +1429,7 @@ SELECT * WHERE {\
                 var h4 = document.createElement( "h4" );
                 content.appendChild( h4 );
                 h4.textContent = "Floor "+floor_id;
-                content.appendChild( renderThingSet(floors[floor_id],map,close) );
+                content.appendChild(renderThingSet(floors[floor_id], map, options, close) );
             });
         });
     }
