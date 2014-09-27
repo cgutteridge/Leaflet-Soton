@@ -1265,6 +1265,13 @@ SELECT * WHERE {\
         for (var level in rooms) {
             var levelRooms = rooms[level];
 
+            levelRooms.sort(function(a, b) {
+                if (a > b) {
+                    return 1;
+                }
+                return -1;
+            });
+
             levelRooms.forEach(function(uri) {
                 var room = LS.getFeatureByURI(uri);
 
