@@ -437,9 +437,9 @@ SELECT * WHERE {\
     var transparaentStyle = function(feature) {return {weight: 0, opacity: 0, fillOpacity: 0};};
 
     var layerNames = [
-        'sites', 
-       // 'parking', 
-        'bicycleParking', 
+        'sites',
+       // 'parking',
+        'bicycleParking',
         'buildings'];
 
     var busRouteStyle = function(feature) {
@@ -1019,12 +1019,12 @@ SELECT * WHERE {\
                 map.closePopup(map._popup);
             }
         },
-    	showFeaturePopup: function(feature,latlng )
+        showFeaturePopup: function(feature,latlng )
         {
             var map = this;
             var content;
             var popupOptions = {};
-    
+
             // When the feature is clicked on
             if ("buildingpart" in feature.properties) {
                 if (feature.properties.buildingpart === "room") {
@@ -1035,7 +1035,7 @@ SELECT * WHERE {\
             } else { // Assume that it is a printer
                 // TODO: Use different icons where appropriate
                 popupOptions.offset = icons.vendingHotDrinks.options.popupAnchor;
-    
+
                 if ('vending' in feature.properties) {
                     content = vendingPopupTemplate(feature.properties);
                 } else {
@@ -1087,7 +1087,7 @@ SELECT * WHERE {\
 
             var image_dom = imageTemplate( properties,options,map,close);
             if( image_dom ) { content.appendChild( image_dom ); }
-            
+
             return;
 
             if ('contents' in properties) {
@@ -1282,7 +1282,7 @@ SELECT * WHERE {\
 
                 if ("center" in room.properties) {
                     info.geo = true;
-                } 
+                }
 
                 if( !( level in floors ) ) { floors[level] = {}; }
                 floors[level][uri] = info;
@@ -1302,7 +1302,7 @@ SELECT * WHERE {\
             if (feature === null) {
                 console.error("no feature for " + machine);
                 return;
-            }            
+            }
 
             var info = { "label":feature.properties.label, "uri":feature.properties.uri, "geo":false };
             if ("geometry" in feature) { info.geo = true; }
@@ -1324,7 +1324,7 @@ SELECT * WHERE {\
             if (feature === null) {
                 console.error("no feature for " + machine);
                 return;
-            }            
+            }
 
             var info = { "label":feature.properties.label, "uri":feature.properties.uri, "geo":false };
             if ("geometry" in feature) { info.geo = true; }
@@ -1351,7 +1351,7 @@ SELECT * WHERE {\
                     var feature = LS.getFeatureByURI(info.uri);
                     close();
                     map.panByURI(info.uri,20,{ 'animate':true });
-                    if( featureHasPopup(feature) ) { 
+                    if( featureHasPopup(feature) ) {
                         map.showFeaturePopup( feature, feature.properties.center );
                     }
                 };
@@ -1383,7 +1383,7 @@ SELECT * WHERE {\
 
             var floor_ids = Object.keys( floors );
             floor_ids.sort();
-            
+
             floor_ids.forEach(function(floor_id) {
                 var h4 = document.createElement( "h4" );
                 content.appendChild( h4 );
