@@ -685,7 +685,7 @@ SELECT * WHERE {\
                                     if ("name" in part.properties && "ref" in part.properties) {
                                         content = part.properties.name + " (" + part.properties.ref + ")";
                                     } else if ("ref" in part.properties) {
-                                        content = "<span style='font-size:90%'>room</span><br/>" + part.properties.ref;
+                                        content = part.properties.ref;
                                     } else if ("name" in part.properties) {
                                         content = part.properties.name;
                                     } else {
