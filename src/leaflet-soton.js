@@ -1355,14 +1355,13 @@ SELECT * WHERE {\
         var content = document.createElement( 'div' );
         content_ids.forEach(function(thing_id) {
             var info = set[thing_id];
-            var div = document.createElement( 'div' );
-            var html = "<a title='click for more information' href='"+info.uri+"'>"+info.label+"</a>";
-            div.innerHTML = html;
-            if( info.geo ) {
-                div.appendChild( document.createTextNode( ' ' ) );
-                var locate_link = createLink('#', false, div);
+            var div = document.createElement('div');
 
-                locate_link.onclick = function() {
+            if (info.geo) {
+                var link = createLink('#', false, div);
+                link.textContent = info.label
+
+                link.onclick = function() {
                     var feature = LS.getFeatureByURI(info.uri);
 
                     close();
@@ -1383,11 +1382,22 @@ SELECT * WHERE {\
                         map.showFeaturePopup(feature, latlng, options);
                     }
                 };
+            } else {
+                var span = document.createElement("span");
+                span.textContent = info.label + "  ";
 
-                locate_link.innerHTML = ' <span title="Show this on map" class="glyphicon glyphicon-screenshot">\u2316</span>';
+                div.appendChild(span);
+
+                var link = document.createElement('a');
+                link.setAttribute('href', info.uri);
+                link.setAttribute('target', '_blank');
+                link.className = 'ls-popup-uri';
+                link.textContent = "(Full Information)";
+
+                div.appendChild(link);
             }
 
-            content.appendChild( div );
+            content.appendChild(div);
         });
         return content;
     }
