@@ -144,6 +144,17 @@ L.Route = L.FeatureGroup.extend({
 if ("Sidebar" in L.Control) {
     L.Control.Route = L.Control.Sidebar.extend({
         initialize: function (routeLayer, placeholder, options) {
+            function showStopList(name) {
+                var previousActiveRoute = activeRouteForRouteMaster[activeRouteMaster];
+
+                console.log("hiding " + previousActiveRoute);
+                stopLists[previousActiveRoute].style.display = "none";
+                descriptions[previousActiveRoute].style.display = "none"
+                console.log("showing " + name);
+                stopLists[name].style.display = "block";
+                descriptions[name].style.display = "block"
+            }
+
             L.Control.Sidebar.prototype.initialize.call(this, placeholder, options);
             L.setOptions(this, options);
 
@@ -163,44 +174,97 @@ if ("Sidebar" in L.Control) {
                 routeMasterNames.sort(this.options.routeMasterSort);
             }
 
+            var descriptions = {};
+            var stopLists = {};
+
+            var activeRouteMaster = "U1";
+            var activeRouteForRouteMaster = {};
+
             for (var i in routeMasterNames) {
                 var routeMasterName = routeMasterNames[i];
                 var routeMaster = routeMasters[routeMasterName];
 
                 var li = L.DomUtil.create('li', '', ul);
                 var a = L.DomUtil.create('a', '', li);
-
                 a.style.background = routeMaster.routes[0].properties.colour;
+                a.textContent = "U";
 
-                a.textContent = routeMaster.name;
+                var strong = document.createElement("strong");
+                strong.textContent = routeMasterName.slice(1);
+
+                console.log(routeMaster);
+
+                a.appendChild(strong);
+
+                activeRouteForRouteMaster[routeMasterName] = routeMaster.routes[0].properties.name;
+
                 a.onclick = (function(routeMasterName) {
                     return function() {
                         routeMasterRouteLists[activeRouteMaster].style.display = "none";
                         routeMasterRouteLists[routeMasterName].style.display = "block";
+
+                        var activeRoute = activeRouteForRouteMaster[routeMasterName];
+
+                        showStopList(activeRoute);
+
                         activeRouteMaster = routeMasterName;
+
+                        routeLayer.resetRoutes();
+                        routeLayer.highlightRoute(activeRoute);
                     };
                 })(routeMasterName);
 
                 // The route lists
 
-                var routeList = this._createRouteList(routeMaster);
+                var routeList = this.createRouteList(routeMaster, function(routeName) {
+                    routeLayer.resetRoutes();
+
+                    showStopList(routeName);
+
+                    activeRouteForRouteMaster[activeRouteMaster] = routeName;
+                    routeLayer.highlightRoute(routeName);
+                });
+
                 routeMasterRouteLists[routeMasterName] = routeList;
 
                 routeList.style.display = "none";
-
                 this._contentContainer.appendChild(routeList);
+
+                // The stops
+                for (var i in routeMaster.routes) {
+                    var route = routeMaster.routes[i];
+
+                    // Add the description
+                    var description = L.DomUtil.create('div', 'ls-route-description');
+                    description.textContent = route.properties.name.split(": ")[1].replace("=>", "\u2192");
+
+                    descriptions[route.properties.name] = description;
+
+                    // Add the list of stops
+                    var stopList = this.createStopList(route);
+                    stopLists[route.properties.name] = stopList;
+
+                    if (activeRouteMaster === routeMasterName &&
+                        activeRouteForRouteMaster[routeMasterName] === route.properties.name) {
+
+                        stopList.style.display = "block";
+                        description.style.display = "block";
+                    } else {
+                        stopList.style.display = "none";
+                        description.style.display = "none";
+                    }
+
+                    this._contentContainer.appendChild(description);
+                    this._contentContainer.appendChild(stopList);
+                }
             }
 
             var activeRouteMaster = "U1"; // TODO: Dont hardcode like this
 
             routeMasterRouteLists[activeRouteMaster].style.display = "block";
         },
-        _createRouteList: function(routeMaster) {
-            var div = L.DomUtil.create('div', null);
-
-            var ul = L.DomUtil.create('ul', 'ls-route-list', div);
-
-            var routeLayer = this._routeLayer;
+        createRouteList: function(routeMaster, routeSelected) {
+            var ul = L.DomUtil.create('ul', 'ls-route-list');
 
             var stopLists = {};
             for (var i in routeMaster.routes) {
@@ -209,62 +273,47 @@ if ("Sidebar" in L.Control) {
                 var li = L.DomUtil.create('li', '', ul);
                 var a = L.DomUtil.create('a', null, li);
 
-                //a.style.borderColor = route.properties.colour;
                 a.style.background = route.properties.colour;
 
-                a.textContent = route.properties.ref;
+                a.textContent = "U";
+                var strong = document.createElement("strong");
+                strong.textContent = route.properties.ref.slice(1);
+                a.appendChild(strong);
+
                 a.onclick = (function(routeName) {
                     return function() {
-                        routeLayer.resetRoutes();
-                        stopLists[activeStopList].style.display = "none";
-                        stopLists[routeName].style.display = "block";
-                        activeStopList = routeName;
-                        routeLayer.highlightRoute(routeName);
+                        routeSelected(routeName);
                     };
                 })(route.properties.name);
-
-                // The stops
-
-                var stopList = this._createStopList(route);
-                stopLists[route.properties.name] = stopList;
-
-                stopList.style.display = "none";
-
-                div.appendChild(stopList);
             }
 
-            var activeStopList = routeMaster.routes[0].properties.name;
-            stopLists[activeStopList].style.display = "block";
-            //routeLayer.highlightRoute(activeStopList);
-
-            return div;
+            return ul;
         },
-        _createStopList: function(route) {
-            var div = L.DomUtil.create('div', null, this._div);
-
-            var description = L.DomUtil.create('div', 'ls-route-description', div);
-            description.textContent = route.properties.name.split(": ")[1].replace("=>", "\u2192");
-
-            var ul = L.DomUtil.create('ul', 'ls-stop-list', div);
+        createStopList: function(route) {
+            var ul = L.DomUtil.create('ul', 'ls-stop-list');
 
             ul.style.listStyleImage = "url(" + LS.imagePath + "bus_stop.png)";
 
             var routeLayer = this._routeLayer;
+
             var busStops = routeLayer.getStops();
 
             for (var i in route.properties.stops) {
                 var stop = route.properties.stops[i];
-
                 var li = L.DomUtil.create('li', '', ul);
-
                 var busStop = busStops[stop];
-
                 var a = L.DomUtil.create('a', '', li);
 
                 if (typeof(busStop) !== "undefined") {
                     a.textContent = busStop.properties.name;
                     a.onclick = (function(uri) {
                         return function() {
+                            if (document.body.clientWidth <= 767) {
+                              hideSidebars();
+
+                              map.invalidateSize();
+                            }
+
                             routeLayer.panToStop(uri, {
                                 animate: true
                             });
@@ -285,7 +334,7 @@ if ("Sidebar" in L.Control) {
                 }
             }
 
-            return div;
+            return ul;
         }
     });
 
