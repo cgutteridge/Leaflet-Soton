@@ -1435,8 +1435,20 @@ SELECT * WHERE {\
                 }
             }
 
-            var floor_ids = Object.keys( floors );
-            floor_ids.sort();
+            var floor_ids = Object.keys(floors);
+
+            floor_ids.sort(function(a, b) {
+              if (a === "Unknown") return 1;
+              if (b === "Unknown") return -1;
+
+              a = parseInt(a, 10);
+              b = parseInt(b, 10);
+
+              if (a < b) {
+                return -1;
+              }
+              return 1;
+            });
 
             floor_ids.forEach(function(floor_id) {
                 var h4 = document.createElement( "h4" );
