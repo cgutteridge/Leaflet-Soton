@@ -785,9 +785,13 @@ SELECT * WHERE {\
                         workstationMarkerLayer = LS.workstationLayer();
 
                         LS.on("workstationData", function(data) {
-                            map.removeLayer(workstationMarkerLayer);
-                            workstationMarkerLayer = LS.workstationLayer();
-                            map.addLayer(workstationMarkerLayer);
+                            if (map.hasLayer(workstationMarkerLayer)) {
+                                map.removeLayer(workstationMarkerLayer);
+                                workstationMarkerLayer = LS.workstationLayer();
+                                map.addLayer(workstationMarkerLayer);
+                            } else {
+                                workstationMarkerLayer = LS.workstationLayer();
+                            }
                         });
                     }
 
