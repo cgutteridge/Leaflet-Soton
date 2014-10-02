@@ -277,6 +277,289 @@ SELECT * WHERE {\
                     LS.fire("workstationData", LS.workstationData);
                 }
             );
+        },
+        infoTemplates: {
+            room: function(properties, options, map) {
+                properties = L.extend({}, properties);
+
+                if (!("name" in properties)) {
+                    properties.name = "Room ";
+                    if ("ref" in properties) {
+                        properties.name += properties.ref;
+                    }
+                }
+
+                return getTemplateWrapper(properties, function(content) {
+
+                    var image_dom = imageTemplate(properties, options, map, close);
+                    if( image_dom ) { content.appendChild( image_dom ); }
+
+                    return;
+
+                    if ('contents' in properties) {
+                        properties.contents.forEach(function(feature) {
+                            createBlankLink(feature.feature, feature.label, tabs.contents);
+
+                            if (feature.subject === "http://id.southampton.ac.uk/point-of-interest-category/iSolutions-Workstations") {
+                                var content = '<a href="' + feature.feature + '">' + feature.label + '</a>';
+                                var data = properties.data;
+                                if (typeof data !== 'undefined' && 'total_seats' in data) {
+                                    content += '<br>' + data.status;
+                                    content += '<br>' + data.free_seats + ' seats free (' + data.total_seats + ' total seats)';
+                                }
+                                return content;
+                            } else {
+                                return '<a href="' + feature.feature + '">' + feature.label + '</a>';
+                            }
+                        });
+                    }
+
+                    if ('features' in properties) {
+                        var featureList = document.createElement("ul");
+
+                        properties.features.forEach(function(feature) {
+                            var featureLi = document.createElement("li");
+
+                            createBlankLink(feature.feature, feature.label, featureLi);
+
+                            featureList.appendChild(featureLi);
+                        });
+
+                        tabs.features.appendChild(featureList);
+                    }
+
+                    // TODO: Find a better way to match the rooms, also add the rooms
+                    // on level 5.
+                    var bookableLibraryRoomNames = ["1A", "1B", "1C", "2A", "2B", "2C",
+                                                    "2D", "3A", "3B", "3C", "3D", "3E",
+                                                    "3F"];
+                    if ('name' in properties &&
+                        bookableLibraryRoomNames.indexOf(properties.name) != -1) {
+
+                        createBlankLink("http://libcal.soton.ac.uk/booking/hartleyrooms",
+                                        "This room can be booked through the Library Room Booking system.",
+                                        tabs.bookings);
+                    }
+                });
+            },
+            verticalPassage: function(properties) {
+                properties = L.extend({}, properties);
+
+                if (!("name" in properties)) {
+                    if (properties["buildingpart:verticalpassage"] === "stairway") {
+                        properties.name = "Stairway";
+                    } else if (properties["buildingpart:verticalpassage"] === "lift") {
+                        properties.name = "Lift";
+                    } else {
+                        properties.name = "Vertical Passage";
+                    }
+
+                    if ("ref" in properties) {
+                        properties.name += properties.ref;
+                    }
+                }
+
+                return getTemplateWrapper(properties, function(content) {
+
+                    if ("level" in properties) {
+                        content.appendChild(document.createTextNode("Levels:"));
+
+                        var levelList = document.createElement("ul");
+
+                        properties.level.forEach(function(level) {
+                            var levelLi = document.createElement("li");
+                            levelLi.textContent = level;
+
+                            levelList.appendChild(levelLi);
+                        });
+
+                        content.appendChild(levelList);
+                    }
+                });
+            },
+            printer: function(properties) {
+                properties.name = "Printer";
+
+                return getTemplateWrapper(properties, function(content) {
+
+                });
+            },
+            vendingMachine: function(properties) {
+                properties.name = "Vending Machine";
+
+                return getTemplateWrapper(properties, function(content) {
+
+                    content.textContent = properties.vending;
+
+                });
+            },
+            site: function(properties) {
+                return getTemplateWrapper(properties, function(content) {
+
+                });
+            },
+            building: function(properties, options, map, close) {
+                var indoor = options.indoor;
+
+                return getTemplateWrapper(properties, function(content) {
+
+                    var image_dom = imageTemplate(properties, options, map, close);
+
+                    if (image_dom) {
+                        content.appendChild(image_dom);
+                    }
+
+                    var floors = {};
+
+                    // Rooms
+                    if (indoor) {
+                        addRoomsToFloors(properties.rooms, floors);
+
+                        if ("services" in properties) {
+                            var services = properties.services;
+
+                            if ("vendingMachines" in services) {
+                                addVendingMachinesToFloors(services.vendingMachines, floors);
+                            }
+
+                            if ("mfds" in services) {
+                                addMFDsToFloors(services.mfds, floors);
+                            }
+                        }
+                    }
+
+                    var floor_ids = Object.keys(floors);
+
+                    floor_ids.sort(function(a, b) {
+                      if (a === "Unknown") return 1;
+                      if (b === "Unknown") return -1;
+
+                      a = parseInt(a, 10);
+                      b = parseInt(b, 10);
+
+                      if (a < b) {
+                        return -1;
+                      }
+                      return 1;
+                    });
+
+                    floor_ids.forEach(function(floor_id) {
+                        var h4 = document.createElement( "h4" );
+                        content.appendChild( h4 );
+                        h4.textContent = "Floor "+floor_id;
+                        content.appendChild(renderThingSet(floors[floor_id], map, options, close) );
+                    });
+                });
+            },
+            pointOfService: function(properties) {
+                return getTemplateWrapper(properties, function(content) {
+
+                    var description = document.createElement("div");
+                    if ("description" in properties) {
+                        description.innerHTML = properties.description;
+                    } else {
+                        description.textContent = "No Description Available";
+                    }
+                    content.appendChild(description);
+
+                    if ("offerings" in properties) {
+                        Object.keys(properties.offerings).forEach(function(sectionURI) {
+                            var section = properties.offerings[sectionURI];
+
+                            var header = document.createElement("h4");
+                            header.textContent = section.label;
+
+                            content.appendChild(header);
+
+                            section.items.forEach(function(item) {
+                                var a = document.createElement("a");
+
+                                a.textContent = item.label;
+                                a.href = item.uri;
+
+                                content.appendChild(a);
+                                content.appendChild(document.createElement("br"));
+                            });
+                        });
+                    }
+                });
+            },
+            parking: function(properties) {
+                if (!('name' in properties))
+                    properties.name = 'Car Park';
+
+                return getTemplateWrapper(properties, function(content) {
+                    var table = createPropertyTable(
+                        [
+                            "Access",
+                            "Spaces",
+                            "Fee"
+                        ],
+                        [
+                            properties.access,
+                            properties.capacity,
+                            properties.fee
+                        ]
+                    );
+
+                    content.appendChild(table);
+                });
+            },
+            bicycleParking: function(properties) {
+                if (!('name' in properties))
+                    properties.name = 'Bicycle Parking';
+
+                return getTemplateWrapper(properties, function(content) {
+                    var table = createPropertyTable(
+                        [
+                            "Capacity",
+                            "Type",
+                            "Covered"
+                        ],
+                        [
+                            properties.capacity,
+                            properties.bicycle_parking,
+                            properties.covered
+                        ]
+                    );
+
+                    content.appendChild(table);
+                });
+            },
+            busStop: function(properties) {
+                return getTemplateWrapper(properties, function(content) {
+
+                    var routeList = document.createElement("ul");
+                    routeList.className = "ls-route-list";
+
+                    properties.routes.forEach(function(route) {
+                        var routeLi = document.createElement("li");
+                        routeLi.textContent = route;
+
+                        routeList.appendChild(routeLi);
+                    });
+
+                    content.appendChild(routeList);
+
+                    var IFrame = document.createElement('iframe');
+                    IFrame.setAttribute('src', 'http://bus.southampton.ac.uk/bus-stop-iframe/' + properties.uri.slice(37)  + ".html")
+                    IFrame.setAttribute('frameBorder', '0');
+                    IFrame.setAttribute('style', 'width: 100%; height 100%;');
+
+                    content.appendChild(IFrame);
+
+                    console.log(properties);
+                });
+            },
+            busRoute: function(properties) {
+                return getTemplateWrapper(properties, function(content) {
+
+                /*
+                 * note
+                */
+
+                });
+            }
         }
     });
 
@@ -493,6 +776,13 @@ SELECT * WHERE {\
             var showLevel = null;
             map._startLevel = options.level || "1";
 
+            var popupTemplateNames = {
+              sites: "site",
+              buildings: "building",
+              bicycleParking: "bicycleParking",
+              parking: "parking"
+            }
+
             layerNames.forEach(function(layerName) {
                 var layerOptions = {
                     style: function(feature) {
@@ -510,7 +800,7 @@ SELECT * WHERE {\
                     layerOptions.onEachFeature = function(feature, layer) {
                         // When the feature is clicked on
                         layer.on('click', function(e) {
-                            var content = buildingTemplate(feature.properties,
+                            var content = LS.infoTemplates.building(feature.properties,
                                                            options,
                                                            map,
                                                            function() { map.closeInfo(); });
@@ -520,9 +810,11 @@ SELECT * WHERE {\
                     };
                 } else {
                     layerOptions.onEachFeature = function(feature, layer) {
+                        var popupName = popupTemplateNames[layerName];
+
                         // When the feature is clicked on
                         layer.on('click', function(e) {
-                            var content = popupTemplates[layerName](feature.properties);
+                            var content = LS.infoTemplates[popupName](feature.properties);
 
                             map.showInfo(content, e.latlng);
                         });
@@ -1027,18 +1319,18 @@ SELECT * WHERE {\
             // When the feature is clicked on
             if ("buildingpart" in feature.properties) {
                 if (feature.properties.buildingpart === "room") {
-                    content = roomPopupTemplate(feature.properties, options, map);
+                    content = LS.infoTemplates.room(feature.properties, options, map);
                 } else if (feature.properties.buildingpart === "verticalpassage") {
-                    content = verticalPassagePopupTemplate(feature.properties);
+                    content = LS.infoTemplates.verticalPassage(feature.properties);
                 }
             } else { // Assume that it is a printer
                 // TODO: Use different icons where appropriate
                 popupOptions.offset = icons.vendingHotDrinks.options.popupAnchor;
 
                 if ('vending' in feature.properties) {
-                    content = vendingPopupTemplate(feature.properties);
+                    content = LS.infoTemplates.vendingMachine(feature.properties);
                 } else {
-                    content = printerPopupTemplate(feature.properties);
+                    content = LS.infoTemplates.printer(feature.properties);
                 }
             }
             map.showInfo(content, latlng, popupOptions);
@@ -1063,139 +1355,7 @@ SELECT * WHERE {\
         return L.marker(latlng, {icon: icon});
     }
 
-    // Template functions for creating the popups
-
-    var popupTemplates = {
-        sites: siteTemplate,
-        buildings: buildingTemplate,
-        bicycleParking: bicycleParkingTemplate
-        //parking: parkingTemplate
-    };
-
-    function roomPopupTemplate(properties, options, map) {
-        properties = L.extend({}, properties);
-
-        if (!("name" in properties)) {
-            properties.name = "Room ";
-            if ("ref" in properties) {
-                properties.name += properties.ref;
-            }
-        }
-
-        return getTemplateWrapper(properties, function(content) {
-
-            var image_dom = imageTemplate(properties, options, map, close);
-            if( image_dom ) { content.appendChild( image_dom ); }
-
-            return;
-
-            if ('contents' in properties) {
-                properties.contents.forEach(function(feature) {
-                    createBlankLink(feature.feature, feature.label, tabs.contents);
-
-                    if (feature.subject === "http://id.southampton.ac.uk/point-of-interest-category/iSolutions-Workstations") {
-                        var content = '<a href="' + feature.feature + '">' + feature.label + '</a>';
-                        var data = properties.data;
-                        if (typeof data !== 'undefined' && 'total_seats' in data) {
-                            content += '<br>' + data.status;
-                            content += '<br>' + data.free_seats + ' seats free (' + data.total_seats + ' total seats)';
-                        }
-                        return content;
-                    } else {
-                        return '<a href="' + feature.feature + '">' + feature.label + '</a>';
-                    }
-                });
-            }
-
-            if ('features' in properties) {
-                var featureList = document.createElement("ul");
-
-                properties.features.forEach(function(feature) {
-                    var featureLi = document.createElement("li");
-
-                    createBlankLink(feature.feature, feature.label, featureLi);
-
-                    featureList.appendChild(featureLi);
-                });
-
-                tabs.features.appendChild(featureList);
-            }
-
-            // TODO: Find a better way to match the rooms, also add the rooms
-            // on level 5.
-            var bookableLibraryRoomNames = ["1A", "1B", "1C", "2A", "2B", "2C",
-                                            "2D", "3A", "3B", "3C", "3D", "3E",
-                                            "3F"];
-            if ('name' in properties &&
-                bookableLibraryRoomNames.indexOf(properties.name) != -1) {
-
-                createBlankLink("http://libcal.soton.ac.uk/booking/hartleyrooms",
-                                "This room can be booked through the Library Room Booking system.",
-                                tabs.bookings);
-            }
-
-        });
-    }
-
-    function verticalPassagePopupTemplate(properties) {
-        properties = L.extend({}, properties);
-
-        if (!("name" in properties)) {
-            if (properties["buildingpart:verticalpassage"] === "stairway") {
-                properties.name = "Stairway";
-            } else if (properties["buildingpart:verticalpassage"] === "lift") {
-                properties.name = "Lift";
-            } else {
-                properties.name = "Vertical Passage";
-            }
-
-            if ("ref" in properties) {
-                properties.name += properties.ref;
-            }
-        }
-
-        return getTemplateWrapper(properties, function(content) {
-
-            if ("level" in properties) {
-                content.appendChild(document.createTextNode("Levels:"));
-
-                var levelList = document.createElement("ul");
-
-                properties.level.forEach(function(level) {
-                    var levelLi = document.createElement("li");
-                    levelLi.textContent = level;
-
-                    levelList.appendChild(levelLi);
-                });
-
-                content.appendChild(levelList);
-            }
-        });
-    }
-
-    function printerPopupTemplate(properties) {
-        properties.name = "Printer";
-
-        return getTemplateWrapper(properties, function(content) {
-
-        });
-    }
-
-    function vendingPopupTemplate(properties) {
-        properties.name = "Vending Machine";
-
-        return getTemplateWrapper(properties, function(content) {
-
-            content.textContent = properties.vending;
-
-        });
-    }
-
-    function siteTemplate(properties) {
-        return getTemplateWrapper(properties, function(content) {
-
-        });
-    }
+    // Templating Utility Functions
 
     function imageTemplate(properties, options, map, close) {
 
@@ -1409,174 +1569,6 @@ SELECT * WHERE {\
         return content;
     }
 
-    function buildingTemplate(properties, options, map, close) {
-        var indoor = options.indoor;
-
-        return getTemplateWrapper(properties, function(content) {
-
-            var image_dom = imageTemplate(properties, options, map, close);
-
-            if (image_dom) {
-                content.appendChild(image_dom);
-            }
-
-            var floors = {};
-
-            // Rooms
-            if (indoor) {
-                addRoomsToFloors(properties.rooms, floors);
-
-                if ("services" in properties) {
-                    var services = properties.services;
-
-                    if ("vendingMachines" in services) {
-                        addVendingMachinesToFloors(services.vendingMachines, floors);
-                    }
-
-                    if ("mfds" in services) {
-                        addMFDsToFloors(services.mfds, floors);
-                    }
-                }
-            }
-
-            var floor_ids = Object.keys(floors);
-
-            floor_ids.sort(function(a, b) {
-              if (a === "Unknown") return 1;
-              if (b === "Unknown") return -1;
-
-              a = parseInt(a, 10);
-              b = parseInt(b, 10);
-
-              if (a < b) {
-                return -1;
-              }
-              return 1;
-            });
-
-            floor_ids.forEach(function(floor_id) {
-                var h4 = document.createElement( "h4" );
-                content.appendChild( h4 );
-                h4.textContent = "Floor "+floor_id;
-                content.appendChild(renderThingSet(floors[floor_id], map, options, close) );
-            });
-        });
-    }
-
-    function pointOfServiceTemplate(properties) {
-        return getTemplateWrapper(properties, function(content) {
-
-            var description = document.createElement("div");
-            if ("description" in properties) {
-                description.innerHTML = properties.description;
-            } else {
-                description.textContent = "No Description Available";
-            }
-            content.appendChild(description);
-
-            if ("offerings" in properties) {
-                Object.keys(properties.offerings).forEach(function(sectionURI) {
-                    var section = properties.offerings[sectionURI];
-
-                    var header = document.createElement("h4");
-                    header.textContent = section.label;
-
-                    content.appendChild(header);
-
-                    section.items.forEach(function(item) {
-                        var a = document.createElement("a");
-
-                        a.textContent = item.label;
-                        a.href = item.uri;
-
-                        content.appendChild(a);
-                        content.appendChild(document.createElement("br"));
-                    });
-                });
-            }
-        });
-    }
-
-    function parkingTemplate(properties) {
-        if (!('name' in properties))
-            properties.name = 'Car Park';
-
-        return getTemplateWrapper(properties, function(content) {
-            var table = createPropertyTable(
-                [
-                    "Access",
-                    "Spaces",
-                    "Fee"
-                ],
-                [
-                    properties.access,
-                    properties.capacity,
-                    properties.fee
-                ]
-            );
-
-            content.appendChild(table);
-        });
-    }
-
-    function bicycleParkingTemplate(properties) {
-        if (!('name' in properties))
-            properties.name = 'Bicycle Parking';
-
-        return getTemplateWrapper(properties, function(content) {
-            var table = createPropertyTable(
-                [
-                    "Capacity",
-                    "Type",
-                    "Covered"
-                ],
-                [
-                    properties.capacity,
-                    properties.bicycle_parking,
-                    properties.covered
-                ]
-            );
-
-            content.appendChild(table);
-        });
-    }
-
-    function busStopTemplate(properties) {
-        return getTemplateWrapper(properties, function(content) {
-
-            var routeList = document.createElement("ul");
-
-            properties.routes.forEach(function(route) {
-                var routeLi = document.createElement("li");
-                routeLi.textContent = route;
-
-                routeList.appendChild(routeLi);
-            });
-
-            content.appendChild(routeList);
-
-            var IFrame = document.createElement('iframe');
-            IFrame.setAttribute('src', 'http://bus.southampton.ac.uk/bus-stop-iframe/' + properties.uri.slice(37)  + ".html")
-            IFrame.setAttribute('frameBorder', '0');
-            IFrame.setAttribute('style', 'width: 100%; height 100%;');
-
-            content.appendChild(IFrame);
-
-            console.log(properties);
-        });
-    }
-
-    function busRouteTemplate(properties) {
-        return getTemplateWrapper(properties, function(content) {
-
-        /*
-         * note
-        */
-
-        });
-    }
-
-    // Templating Utility Functions
 
     function capitaliseFirstLetter(string) {
         return string.charAt(0).toUpperCase() + string.slice(1);
