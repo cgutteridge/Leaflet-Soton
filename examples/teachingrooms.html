@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teaching Rooms - University of Southampton</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <link rel="stylesheet" href="../resources/leaflet-locatecontrol/src/L.Control.Locate.css" />
+    <link rel="stylesheet" href="../resources/leaflet/dist/leaflet.css" />
+
+    <link rel="stylesheet" href="../src/leaflet-soton.css" />
+
+    <style>
+        body {
+          padding: 0;
+          margin: 0;
+        }
+
+        html, body, #map {
+          height: 100%;
+        }
+
+        .mycluster {
+          width: 40px;
+          height: 40px;
+          background-color: greenyellow;
+          text-align: center;
+          font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <script src="../resources/leaflet/dist/leaflet-src.js"></script>
+    <script src="../resources/leaflet-markercluster/dist/leaflet.markercluster.js"></script>
+    <script src="../resources/leaflet-locatecontrol/src/L.Control.Locate.js"></script>
+    <script src="../resources/leaflet-hash/leaflet-hash.js"></script>
+    <script src="../resources/leaflet-indoor/leaflet-indoor.js"></script>
+    <script src="../resources/leaflet-route/leaflet-route.js"></script>
+
+    <script src="../src/leaflet-soton.js"></script>
+
+    <script type="text/javascript">
+        LS.imagePath = '../resources/images/';
+        LS.dataPath = '../data.json';
+
+        (function() {
+            function renderThingSet(set, map, options, close) {
+                var content_ids = Object.keys( set );
+                var content = document.createElement( 'div' );
+                content_ids.forEach(function(thing_id) {
+                    var info = set[thing_id];
+                    var div = document.createElement('div');
+
+                    if (info.geo) {
+                        var link = document.createElement("a");
+                        link.href = "#";
+                        div.appendChild(link);
+                        link.textContent = info.label
+
+                        link.onclick = function() {
+                            var feature = LS.getFeatureByURI(info.uri);
+
+                            close();
+
+                            map.panByURI(info.uri, 20, {
+                                animate: true
+                            });
+                        };
+                    } else {
+                        var span = document.createElement("span");
+                        span.textContent = info.label + "  ";
+
+                        div.appendChild(span);
+
+                        var link = document.createElement('a');
+                        link.setAttribute('href', info.uri);
+                        link.setAttribute('target', '_blank');
+                        link.className = 'ls-popup-uri';
+                        link.textContent = "(Full Information)";
+
+                        div.appendChild(link);
+                    }
+
+                    content.appendChild(div);
+                });
+                return content;
+            }
+
+          LS.infoTemplates.building = function(properties, options, map, close) {
+              var content = document.createDocumentFragment();
+
+              var floors = {};
+              var rooms = properties.rooms;
+
+              for (var level in rooms) {
+                  var levelRooms = rooms[level];
+
+                  levelRooms.sort(function(a, b) {
+                      if (a > b) {
+                          return 1;
+                      }
+                      return -1;
+                  });
+
+                  levelRooms.forEach(function(uri) {
+                      var room = LS.getFeatureByURI(uri);
+
+                      if (room === null) {
+                          console.error("Unable to find room " + uri);
+                          return;
+                      }
+
+                      if (!room.properties.teaching) {
+                          return;
+                      }
+
+                      var info = {
+                          label: room.properties.ref,
+                          uri: uri,
+                          geo: ("center" in room.properties)
+                      };
+
+                      if ("name" in room.properties) {
+                          info.label += ":  " + room.properties.name;
+                      }
+
+                      if(!(level in floors)) {
+                          floors[level] = {};
+                      }
+
+                      floors[level][uri] = info;
+                  });
+              }
+
+              var floor_ids = Object.keys(floors);
+
+              floor_ids.sort(function(a, b) {
+                if (a === "Unknown") return 1;
+                if (b === "Unknown") return -1;
+
+                a = parseInt(a, 10);
+                b = parseInt(b, 10);
+
+                if (a < b) {
+                  return -1;
+                }
+                return 1;
+              });
+
+              floor_ids.forEach(function(floor_id) {
+                  var h4 = document.createElement( "h4" );
+                  content.appendChild(h4);
+                  h4.textContent = "Floor "+floor_id;
+                  content.appendChild(renderThingSet(floors[floor_id], map, options, close) );
+              });
+
+              return content;
+          };
+
+          var map = LS.map('map', {
+              workstations: false,
+              indoor: true
+          });
+
+          LS.getData(function(data) {
+              var markers = L.markerClusterGroup({
+                  iconCreateFunction: function (cluster) {
+                    var markers = cluster.getAllChildMarkers();
+
+                    var n = 0;
+
+                    markers.forEach(function(marker) {
+                      n += marker.number;
+                    });
+
+                    return L.divIcon({
+                      html: n,
+                      className: 'mycluster',
+                      iconSize: L.point(40, 40)
+                    });
+                  },
+                  spiderfyOnMaxZoom: false,
+                  showCoverageOnHover: false,
+                  zoomToBoundsOnClick: false,
+                  singleMarkerMode: true
+              });
+
+              data.buildings.features.forEach(function(building) {
+                  var roomsMissing = 0;
+
+                  if (!("rooms" in building.properties)) {
+                      return;
+                  }
+
+                  var rooms = building.properties.rooms;
+
+                  for (var level in rooms) {
+                      var levelRooms = rooms[level];
+
+                      levelRooms.forEach(function(roomURI) {
+                          room = LS.getFeatureByURI(roomURI);
+
+                          if (!room.properties.teaching) {
+                              return;
+                          }
+
+                          if (!("center" in room.properties)) {
+                              roomsMissing += 1;
+                          }
+                      });
+                  }
+
+                  if (roomsMissing != 0) {
+                      var m = L.marker(building.properties.center, {
+                          title: building.properties["loc_ref"]
+                      });
+
+                      m.number = roomsMissing;
+                      markers.addLayer(m);
+                  }
+              });
+
+              map.addLayer(markers);
+          });
+
+          L.control.locate().addTo(map);
+        })();
+    </script>
+</body>
+</html>
