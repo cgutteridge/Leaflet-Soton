@@ -202,7 +202,7 @@
                                 offset: icons.vendingHotDrinks.options.popupAnchor
                             };
 
-                            var content = pointOfServiceTemplate(feature.properties);
+                            var content = LS.infoTemplates.pointOfService(feature.properties);
 
                             this._map.showInfo(content, e.latlng, popupOptions);
                         }
