@@ -186,6 +186,9 @@
                   singleMarkerMode: true
               });
 
+              var totalMappedTeachingRooms = 0;
+              var totalUnMappedTeachingRooms = 0;
+
               data.buildings.features.forEach(function(building) {
                   var roomsMissing = 0;
 
@@ -207,6 +210,9 @@
 
                           if (!("center" in room.properties)) {
                               roomsMissing += 1;
+                              totalUnMappedTeachingRooms += 1;
+                          } else {
+                              totalMappedTeachingRooms += 1;
                           }
                       });
                   }
@@ -220,6 +226,12 @@
                       markers.addLayer(m);
                   }
               });
+
+              console.log("Total mapped teaching rooms: " + totalMappedTeachingRooms);
+              console.log("Total un-mapped teaching rooms: " + totalUnMappedTeachingRooms);
+              console.log("Percentage done: " + ((totalMappedTeachingRooms /
+                    (totalMappedTeachingRooms +
+                     totalUnMappedTeachingRooms)).toFixed(2) * 100) + "%");
 
               map.addLayer(markers);
           });
