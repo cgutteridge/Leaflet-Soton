@@ -1728,10 +1728,6 @@ SELECT * WHERE {\
 
     function getJSON(options, callback) {
         var xhttp = new XMLHttpRequest();
-        xhttp.ontimeout = function () {
-            callback(null);
-        };
-        xhttp.timeout = 4000;
 
         options.data = options.data || null;
 
@@ -1742,6 +1738,10 @@ SELECT * WHERE {\
         }
 
         xhttp.open('GET', url, true);
+        xhttp.ontimeout = function () {
+            callback(null);
+        };
+        xhttp.timeout = 4000;
         xhttp.setRequestHeader('Accept', 'application/json');
 
         xhttp.send(options.data);
