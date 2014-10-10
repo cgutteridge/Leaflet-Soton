@@ -703,31 +703,41 @@ function createBuildingParts(buildings, callback) {
 
             buildingParts.push.apply(buildingParts, buildingEntrances);
 
+            var buildingEntrancesByURI = {};
+            buildingEntrances.forEach(function(entrance) {
+                buildingEntrancesByURI[entrance.properties.uri] = entrance;
+            });
+
             portals.forEach(function(portal) {
-                console.log(JSON.stringify(portal, null, 4));
-
                 if (portal.building in buildings) {
-                    building = buildings[portal.building]
+                    var building = buildings[portal.building]
 
-                    portal.buildingpart = "entrance";
+                    if (portal.uri in buildingEntrancesByURI) {
+                        var entrance = buildingEntrancesByURI[portal.uri];
 
-                    var portalObj = {
-                        type: "Feature",
+                        entrance.properties.label = portal.label;
+                        entrance.properties.comment = portal.comment;
+                    } else {
+                        portal.buildingpart = "entrance";
 
-                        properties: portal
-                    };
+                        var portalObj = {
+                            type: "Feature",
 
-                    if ("lat" in portal && "lon" in portal) {
-                        portalObj.geometry = {
-                            type: "Point",
-                            coordinates: [
-                                parseFloat(portal.lon, 10),
-                                parseFloat(portal.lat, 10)
-                            ]
+                            properties: portal
                         };
-                    }
 
-                    buildingParts.push(portalObj);
+                        if ("lat" in portal && "lon" in portal) {
+                            portalObj.geometry = {
+                                type: "Point",
+                                coordinates: [
+                                    parseFloat(portal.lon, 10),
+                                    parseFloat(portal.lat, 10)
+                                ]
+                            };
+                        }
+
+                        buildingParts.push(portalObj);
+                    }
 
                     buildingProperties = building.properties;
                     if (!("entrances" in buildingProperties)) {
@@ -917,7 +927,7 @@ function getDoors(room, callback) {
 }
 
 function getBuildingEntrances(callback) {
-    var query = "select osm_id, ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon from planet_osm_point where ST_Contains((select ST_Union(way) from uni_site), way) and entrance is not null";
+    var query = "select osm_id, ST_AsGeoJSON(ST_Transform(way, 4326), 10) as polygon, entrance, uri from planet_osm_point where ST_Contains((select ST_Union(way) from uni_site), way) and entrance is not null";
 
     pg.query(query, function(err, results) {
         if (err) {
@@ -935,6 +945,11 @@ function getBuildingEntrances(callback) {
                     buildingpart: "entrance"
                 }
             };
+
+            if (part.uri !== null) {
+                feature.properties.uri = part.uri;
+            }
+
             feature.geometry = JSON.parse(part.polygon);
 
             callback(null, feature);
