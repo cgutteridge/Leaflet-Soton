@@ -155,7 +155,7 @@
                               offset: icons.vendingHotDrinks.options.popupAnchor
                           };
 
-                          var content = vendingPopupTemplate(feature.properties);
+                          var content = LS.infoTemplates.vendingMachine(feature.properties);
 
                           this._map.showInfo(content, e.latlng, popupOptions);
                         }
